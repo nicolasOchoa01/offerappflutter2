@@ -1,44 +1,78 @@
 import 'dart:async';
-import 'dart:developer';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:myapp/src/domain/entities/user.dart';
 
-// Repositorio de marcador de posición para la autenticación.
-// En una aplicación real, esto interactuaría con Firebase Auth, Google Sign-In, etc.
 class AuthRepository {
-  // Stream que emite el estado del usuario actual.
-  // Por ahora, emite un usuario de prueba después de un breve retraso.
-  Stream<User?> get onAuthStateChanged {
-    return Stream.value(
-      const User(
-        uid: 'dummy_uid',
-        username: 'DummyUser',
-        email: 'user@example.com',
-        profileImageUrl: 'https://i.pravatar.cc/150?u=dummy_uid',
-        favorites: [], // Inicialmente sin favoritos
-      ),
-    );
+  final fb_auth.FirebaseAuth _firebaseAuth;
+  final FirebaseFirestore _firestore;
+
+  AuthRepository({
+    fb_auth.FirebaseAuth? firebaseAuth,
+    FirebaseFirestore? firestore,
+  })  : _firebaseAuth = firebaseAuth ?? fb_auth.FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance;
+
+  Stream<User?> get userChanges {
+    return _firebaseAuth.authStateChanges().asyncMap((firebaseUser) async {
+      if (firebaseUser == null) {
+        return null;
+      }
+      final userDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      if (userDoc.exists) {
+        return User.fromMap(userDoc.data()!);
+      } else {
+        return null;
+      }
+    });
   }
 
-  // Devuelve el usuario actual (sincrónicamente, solo para este ejemplo)
-  User? get currentUser {
-    return const User(
-      uid: 'dummy_uid',
-      username: 'DummyUser',
-      email: 'user@example.com',
-      profileImageUrl: 'https://i.pravatar.cc/150?u=dummy_uid',
-      favorites: [],
-    );
+  fb_auth.User? get currentUser => _firebaseAuth.currentUser;
+
+  Future<void> signInWithEmailAndPassword(String email, String password) async {
+    try {
+      await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on fb_auth.FirebaseAuthException catch (e) {
+      throw Exception('Error al iniciar sesión: ${e.message}');
+    }
   }
 
-  // Método para iniciar sesión (simulado)
-  Future<void> signIn() async {
-    // Lógica de inicio de sesión simulada
-    log('Iniciando sesión...', name: 'AuthRepository');
+  Future<void> signUpWithEmailAndPassword({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    try {
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (userCredential.user != null) {
+        final newUser = User(
+          id: userCredential.user!.uid, // Correctly use id
+          username: username,
+          email: email,
+          profileImageUrl: null, 
+          followers: [],
+          following: [],
+          favorites: [],
+        );
+
+        await _firestore
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set(newUser.toMap());
+      }
+    } on fb_auth.FirebaseAuthException catch (e) {
+      throw Exception('Error al registrarse: ${e.message}');
+    }
   }
 
-  // Método para cerrar sesión (simulado)
   Future<void> signOut() async {
-    // Lógica de cierre de sesión simulada
-    log('Cerrando sesión...', name: 'AuthRepository');
+    await _firebaseAuth.signOut();
   }
 }

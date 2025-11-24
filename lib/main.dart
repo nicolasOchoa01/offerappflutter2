@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:myapp/firebase_options.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/data/repositories/user_repository.dart';
-import 'package:myapp/src/presentation/screens/home_screen.dart';
+import 'package:myapp/src/presentation/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -12,6 +13,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await initializeDateFormatting('es_ES', null);
   runApp(const MyApp());
 }
 
@@ -38,7 +40,7 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
-        home: const HomeScreen(),
+        home: const MainScreen(),
       ),
     );
   }

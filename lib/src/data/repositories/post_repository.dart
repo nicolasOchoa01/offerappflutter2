@@ -15,8 +15,7 @@ class PostRepository {
     CloudinaryPublic? cloudinary,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _cloudinary = cloudinary ??
-            CloudinaryPublic('CLOUDINARY_CLOUD_NAME', 'unsigned-upload-preset',
-                cache: false);
+            CloudinaryPublic('dextwzsqv', 'unsigned-upload-preset', cache: false);
 
   CollectionReference<Post> get _postsCollection =>
       _firestore.collection('posts').withConverter<Post>(
@@ -42,6 +41,46 @@ class PostRepository {
     return query.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => doc.data()).toList();
     });
+  }
+
+  Stream<List<Post>> getAllPostsStream() {
+    return _postsCollection.orderBy('timestamp', descending: true).snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => doc.data()).toList();
+    });
+  }
+
+  Stream<List<Post>> getPostsByUserStream(String userId) {
+    return _postsCollection
+        .where('user.uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  Stream<List<Comment>> getCommentsByUserStream(String userId) {
+    return _firestore
+        .collectionGroup('comments')
+        .where('userId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Comment.fromMap(doc.data(), doc.id)).toList());
+  }
+
+  Stream<List<Post>> getFavoritePostsStream(List<String> postIds) {
+    if (postIds.isEmpty) {
+      return Stream.value([]);
+    }
+    // Firestore 'in' query has a limit of 10 items. For more, you'd need multiple queries.
+    return _postsCollection
+        .where(FieldPath.documentId, whereIn: postIds)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  Future<Post?> getPostFuture(String postId) async {
+    final doc = await _postsCollection.doc(postId).get();
+    return doc.data();
   }
 
   Future<void> addPost({required Post post, required File imageFile}) async {
@@ -111,16 +150,6 @@ class PostRepository {
     return _postsCollection
         .doc(postId)
         .collection('comments')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Comment.fromMap(doc.data(), doc.id)).toList());
-  }
-
-  Stream<List<Comment>> getCommentsByUser(String userId) {
-    return _firestore
-        .collectionGroup('comments')
-        .where('userId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) =>

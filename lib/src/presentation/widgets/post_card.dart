@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:myapp/src/domain/entities/post.dart';
 import 'package:myapp/src/domain/entities/user.dart';
+import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/repositories/user_repository.dart';
 import 'package:provider/provider.dart';
 
@@ -53,11 +54,12 @@ class PostCard extends StatelessWidget {
       cardBackgroundColor = Theme.of(context).colorScheme.primary.withAlpha(12); // ~5% opacity
     }
     
-    // Usamos un Consumer para obtener el usuario actual y reaccionar a sus cambios (favoritos)
-    return Consumer<User?>(
-      builder: (context, currentUser, child) {
+    return StreamBuilder<User?>(
+      stream: context.watch<AuthRepository>().userChanges, // Correct: Stream is in AuthRepository
+      builder: (context, snapshot) {
+        final currentUser = snapshot.data;
         final bool isFavorite = currentUser?.favorites.contains(post.id) ?? false;
-        final userRepo = Provider.of<UserRepository>(context, listen: false);
+        final userRepo = context.read<UserRepository>();
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
@@ -141,7 +143,7 @@ class PostCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4.0),
                         Text(
-                          post.location,
+                          post.store,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                         ),
                         const SizedBox(height: 8.0),
@@ -151,7 +153,7 @@ class PostCard extends StatelessWidget {
                           textBaseline: TextBaseline.alphabetic,
                           children: [
                             Text(
-                              "\$${post.discountPrice.toStringAsFixed(2)}",
+                              "${post.discountPrice.toStringAsFixed(2)} €",
                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(context).colorScheme.primary,
@@ -159,7 +161,7 @@ class PostCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8.0),
                             Text(
-                              "\$${post.price.toStringAsFixed(2)}",
+                              "${post.price.toStringAsFixed(2)} €",
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: Colors.grey,
                                     decoration: TextDecoration.lineThrough,
@@ -186,7 +188,7 @@ class PostCard extends StatelessWidget {
                         tooltip: 'Marcar como favorito',
                         onPressed: () {
                           if (currentUser != null) {
-                            userRepo.toggleFavorite(currentUser.uid, post.id);
+                            userRepo.toggleFavorite(currentUser.id, post.id);
                           }
                         },
                       ),

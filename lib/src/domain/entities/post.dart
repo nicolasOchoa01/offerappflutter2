@@ -6,6 +6,7 @@ import 'package:myapp/src/domain/entities/user.dart';
 @immutable
 class Post {
   final String id;
+  final String userId; // Added for consistency and easier access
   final String description;
   final String imageUrl;
   final String location;
@@ -22,6 +23,7 @@ class Post {
 
   const Post({
     required this.id,
+    required this.userId, // Made required
     this.description = '',
     this.imageUrl = '',
     this.location = '',
@@ -40,6 +42,7 @@ class Post {
   factory Post.fromMap(Map<String, dynamic> map, String documentId) {
     return Post(
       id: documentId,
+      userId: map['userId'] ?? '', // Read userId
       description: map['description'] ?? '',
       imageUrl: map['imageUrl'] ?? '',
       location: map['location'] ?? '',
@@ -61,6 +64,7 @@ class Post {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId, // Write userId
       'description': description,
       'imageUrl': imageUrl,
       'location': location,
@@ -79,6 +83,7 @@ class Post {
 
   Post copyWith({
     String? id,
+    String? userId,
     String? description,
     String? imageUrl,
     String? location,
@@ -95,6 +100,7 @@ class Post {
   }) {
     return Post(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       location: location ?? this.location,
