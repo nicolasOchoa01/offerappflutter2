@@ -26,8 +26,7 @@ class AuthService {
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       log('Error creating user: ${e.code}');
-      // Relanzar la excepción para que sea manejada en la UI
-      throw e;
+      rethrow;
     }
   }
 
@@ -40,8 +39,7 @@ class AuthService {
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       log('Error signing in with email and password: ${e.code}');
-      // Relanzar la excepción para que sea manejada en la UI
-      throw e;
+      rethrow;
     }
   }
 }

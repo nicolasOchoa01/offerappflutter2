@@ -25,6 +25,13 @@ class PostRepository {
             toFirestore: (post, _) => post.toMap(),
           );
 
+  Stream<Post> getPostStream(String postId) {
+    return _postsCollection
+        .doc(postId)
+        .snapshots()
+        .map((snapshot) => snapshot.data()!);
+  }
+
   Stream<List<Post>> getPostsStream({String? category}) {
     Query<Post> query = _postsCollection.orderBy('timestamp', descending: true);
 
@@ -88,7 +95,7 @@ class PostRepository {
 
       transaction.update(postRef, {'scores': newScores.map((s) => s.toMap()).toList()});
 
-      final totalScore = newScores.fold<int>(0, (sum, item) => sum + item.value);
+      final totalScore = newScores.fold<int>(0, (total, item) => total + item.value);
       if (totalScore < -15) {
         transaction.update(postRef, {'status': 'vencida'});
       }
@@ -232,8 +239,8 @@ class PostRepository {
 
     if (sortOption == "Puntaje") {
       posts.sort((a, b) {
-        final scoreA = a.scores.fold<int>(0, (sum, s) => sum + s.value);
-        final scoreB = b.scores.fold<int>(0, (sum, s) => sum + s.value);
+        final scoreA = a.scores.fold<int>(0, (total, s) => total + s.value);
+        final scoreB = b.scores.fold<int>(0, (total, s) => total + s.value);
         return scoreB.compareTo(scoreA);
       });
     }

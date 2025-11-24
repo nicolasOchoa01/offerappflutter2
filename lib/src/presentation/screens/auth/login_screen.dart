@@ -22,10 +22,29 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _signIn() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await authService.signInWithEmailAndPassword(
+        _emailController.text,
+        _passwordController.text,
+      );
+      // La navegación es manejada por el redirect de go_router
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error al iniciar sesión: ${e.toString()}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -40,10 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text(
                     '%',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 80,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 40),
                   TextFormField(
@@ -68,21 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        try {
-                          await authService.signInWithEmailAndPassword(
-                            _emailController.text,
-                            _passwordController.text,
-                          );
-                          // La navegación se maneja por el redirect de go_router
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error al iniciar sesión: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: _signIn,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

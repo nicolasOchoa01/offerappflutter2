@@ -24,10 +24,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await authService.createUserWithEmailAndPassword(
+        _emailController.text,
+        _passwordController.text,
+      );
+      // La navegación se maneja por el redirect de go_router
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error al crear la cuenta: ${e.toString()}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -42,10 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text(
                     '%',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 80,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 40),
                   TextFormField(
@@ -81,21 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        try {
-                          await authService.createUserWithEmailAndPassword(
-                            _emailController.text,
-                            _passwordController.text,
-                          );
-                          // La navegación se maneja por el redirect de go_router
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error al crear la cuenta: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: _register,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

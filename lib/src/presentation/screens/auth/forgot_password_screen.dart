@@ -20,10 +20,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  Future<void> _sendResetEmail() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await authService.sendPasswordResetEmail(_emailController.text);
+
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Correo de recuperación enviado.')),
+      );
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -38,10 +57,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const Text(
                     '%',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 80,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 40),
                   TextFormField(
@@ -55,20 +71,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        try {
-                          await authService.sendPasswordResetEmail(_emailController.text);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Correo de recuperación enviado.')),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: _sendResetEmail,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/domain/entities/post.dart';
+import 'package:myapp/src/presentation/screens/create_post_screen.dart';
+import 'package:myapp/src/presentation/screens/post_detail_screen.dart';
 import 'package:myapp/src/presentation/widgets/post_card.dart';
 import 'package:provider/provider.dart';
 
@@ -9,19 +11,17 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos la instancia del repositorio a través de Provider.
     final postRepository = Provider.of<PostRepository>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ofertas'),
-        // Aquí puedes añadir acciones como un filtro o un botón de búsqueda más adelante
+        title: const Text('OfferApp'),
+        centerTitle: true,
+        elevation: 0,
       ),
       body: StreamBuilder<List<Post>>(
-        // CONECTADO: Ahora el stream apunta al método del repositorio
         stream: postRepository.getPostsStream(),
         builder: (context, snapshot) {
-          // El resto del widget maneja los diferentes estados del stream
           if (snapshot.hasError) {
             return Center(child: Text('Error al cargar las ofertas: ${snapshot.error}'));
           }
@@ -31,7 +31,7 @@ class HomeScreen extends StatelessWidget {
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(
               child: Text(
-                'No hay ofertas publicadas todavía. ¡Sé el primero!',
+                'No hay ofertas publicadas todavía. \n¡Sé el primero!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 18, color: Colors.grey),
               ),
@@ -40,7 +40,6 @@ class HomeScreen extends StatelessWidget {
 
           final posts = snapshot.data!;
 
-          // Usamos un ListView para mostrar las tarjetas
           return ListView.builder(
             itemCount: posts.length,
             itemBuilder: (context, index) {
@@ -48,9 +47,12 @@ class HomeScreen extends StatelessWidget {
               return PostCard(
                 post: post,
                 onClick: () {
-                  // TODO: Implementar la navegación a la pantalla de detalles de la publicación.
-                  // Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id)));
-                  print("Tocado el post con ID: ${post.id}");
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PostDetailScreen(post: post),
+                    ),
+                  );
                 },
               );
             },
@@ -59,11 +61,13 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Implementar la navegación a la pantalla para crear una nueva publicación.
-          // Navigator.push(context, MaterialPageRoute(builder: (_) => CreatePostScreen()));
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+          );
         },
-        child: const Icon(Icons.add),
         tooltip: 'Añadir nueva oferta',
+        child: const Icon(Icons.add),
       ),
     );
   }

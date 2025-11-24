@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:myapp/firebase_options.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/repositories/post_repository.dart';
+import 'package:myapp/src/data/repositories/user_repository.dart';
 import 'package:myapp/src/presentation/screens/home_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -26,6 +27,9 @@ class MyApp extends StatelessWidget {
         ),
         Provider<PostRepository>(
           create: (_) => PostRepository(),
+        ),
+        Provider<UserRepository>(
+          create: (_) => UserRepository(),
         ),
       ],
       child: MaterialApp(
