@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:myapp/firebase_options.dart';
-
-import 'src/app.dart';
+import 'package:myapp/src/data/repositories/auth_repository.dart';
+import 'package:myapp/src/data/repositories/post_repository.dart';
+import 'package:myapp/src/presentation/screens/home_screen.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,4 +12,30 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        Provider<AuthRepository>(
+          create: (_) => AuthRepository(),
+        ),
+        Provider<PostRepository>(
+          create: (_) => PostRepository(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'OfferApp',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const HomeScreen(),
+      ),
+    );
+  }
 }

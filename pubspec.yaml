@@ -24,6 +24,7 @@ dependencies:
   json_serializable: ^6.11.2
   google_sign_in: ^6.2.1
   cloudinary_public: ^0.23.1
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:
