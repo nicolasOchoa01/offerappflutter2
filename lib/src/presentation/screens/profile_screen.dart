@@ -29,9 +29,23 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    _setup();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.userId != oldWidget.userId) {
+      _setup();
+    }
+  }
+
+  void _setup() {
     final authRepo = context.read<AuthRepository>();
+    _isMyProfile = authRepo.currentUser?.uid == widget.userId;
+    _tabController = TabController(length: _isMyProfile ? 3 : 2, vsync: this);
+
     if (authRepo.currentUser != null) {
-      _isMyProfile = authRepo.currentUser!.uid == widget.userId;
       context.read<UserRepository>().getUserStream(authRepo.currentUser!.uid).listen((user) {
         if (mounted) {
           setState(() {
@@ -40,7 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
       });
     }
-    _tabController = TabController(length: _isMyProfile ? 3 : 2, vsync: this);
   }
 
   @override
@@ -67,51 +80,45 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       stream: userRepo.getUserStream(widget.userId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data == null) {
-          return const Scaffold(body: Center(child: Text('Usuario no encontrado.')));
+          return const Center(child: Text('Usuario no encontrado.'));
         }
 
         final profileUser = snapshot.data!;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(_isMyProfile ? 'Mi Perfil' : 'Perfil de ${profileUser.username}'),
-            centerTitle: true,
-          ),
-          body: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverToBoxAdapter(
-                  child: _buildProfileHeader(context, profileUser),
-                ),
-                SliverPersistentHeader(
-                  delegate: _SliverAppBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      tabs: _isMyProfile
-                          ? const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment)), Tab(icon: Icon(Icons.favorite))]
-                          : const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment))],
-                    ),
+        return NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverToBoxAdapter(
+                child: _buildProfileHeader(context, profileUser),
+              ),
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    controller: _tabController,
+                    tabs: _isMyProfile
+                        ? const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment)), Tab(icon: Icon(Icons.favorite))]
+                        : const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment))],
                   ),
-                  pinned: true,
                 ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: _isMyProfile
-                  ? [
-                      _buildPostsTab(postRepo, profileUser.id),
-                      _buildCommentsTab(context, postRepo, profileUser.id),
-                      _buildFavoritesTab(postRepo, profileUser),
-                    ]
-                  : [
-                      _buildPostsTab(postRepo, profileUser.id),
-                      _buildCommentsTab(context, postRepo, profileUser.id),
-                    ],
-            ),
+                pinned: true,
+              ),
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: _isMyProfile
+                ? [
+                    _buildPostsTab(postRepo, profileUser.id),
+                    _buildCommentsTab(context, postRepo, profileUser.id),
+                    _buildFavoritesTab(postRepo, profileUser),
+                  ]
+                : [
+                    _buildPostsTab(postRepo, profileUser.id),
+                    _buildCommentsTab(context, postRepo, profileUser.id),
+                  ],
           ),
         );
       },

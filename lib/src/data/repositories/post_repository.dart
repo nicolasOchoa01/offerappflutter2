@@ -5,6 +5,7 @@ import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
 import 'package:myapp/src/domain/entities/post.dart';
 import 'package:myapp/src/domain/entities/score.dart';
+import 'package:myapp/src/domain/entities/user.dart';
 
 class PostRepository {
   final FirebaseFirestore _firestore;
@@ -71,7 +72,6 @@ class PostRepository {
     if (postIds.isEmpty) {
       return Stream.value([]);
     }
-    // Firestore 'in' query has a limit of 10 items. For more, you'd need multiple queries.
     return _postsCollection
         .where(FieldPath.documentId, whereIn: postIds)
         .snapshots()
@@ -83,10 +83,37 @@ class PostRepository {
     return doc.data();
   }
 
-  Future<void> addPost({required Post post, required File imageFile}) async {
+  Future<void> addPost({
+    required String description,
+    required File imageFile,
+    required String location,
+    required double latitude,
+    required double longitude,
+    required String category,
+    required double price,
+    required double discountPrice,
+    required String store,
+    required User user,
+  }) async {
     try {
       final imageUrl = await _uploadImageToCloudinary(imageFile);
-      final newPost = post.copyWith(imageUrl: imageUrl, timestamp: Timestamp.now());
+      final newPost = Post(
+        id: '', 
+        description: description,
+        imageUrl: imageUrl,
+        location: location,
+        latitude: latitude,
+        longitude: longitude,
+        category: category,
+        price: price,
+        discountPrice: discountPrice,
+        store: store,
+        userId: user.id,
+        user: user,
+        timestamp: Timestamp.now(),
+        scores: [],
+        status: 'activa',
+      );
       await _postsCollection.add(newPost);
     } catch (e) {
       throw Exception('Error al añadir la publicación: ${e.toString()}');
