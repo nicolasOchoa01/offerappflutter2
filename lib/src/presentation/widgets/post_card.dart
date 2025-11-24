@@ -188,7 +188,7 @@ class PostCard extends StatelessWidget {
                         tooltip: 'Marcar como favorito',
                         onPressed: () {
                           if (currentUser != null) {
-                            userRepo.toggleFavorite(currentUser.id, post.id);
+                            userRepo.toggleFavorite(currentUser.id, post.id, isFavorite);
                           }
                         },
                       ),

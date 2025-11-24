@@ -44,6 +44,19 @@ class PostRepository {
     });
   }
 
+    Stream<List<Comment>> getCommentsStream(String postId) {
+    return _postsCollection
+        .doc(postId)
+        .collection('comments')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Comment.fromMap(doc.data(), doc.id);
+      }).toList();
+    });
+  }
+
   Stream<List<Post>> getAllPostsStream() {
     return _postsCollection.orderBy('timestamp', descending: true).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => doc.data()).toList();
@@ -118,6 +131,23 @@ class PostRepository {
     } catch (e) {
       throw Exception('Error al añadir la publicación: ${e.toString()}');
     }
+  }
+
+    Future<void> addComment({
+    required String postId,
+    required String userId,
+    required String text,
+    required User user,
+  }) async {
+    final comment = Comment(
+      id: '', // Firestore will generate this
+      postId: postId,
+      userId: userId,
+      text: text,
+      user: user, // Pass the user object directly
+      timestamp: Timestamp.now(),
+    );
+    await _postsCollection.doc(postId).collection('comments').add(comment.toMap());
   }
 
   Future<String> _uploadImageToCloudinary(File imageFile) async {

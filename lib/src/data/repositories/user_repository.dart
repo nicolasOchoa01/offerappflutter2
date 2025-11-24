@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,11 +13,14 @@ class UserRepository {
 
   CollectionReference<User> get _usersCollection =>
       _firestore.collection('users').withConverter<User>(
-            fromFirestore: (snapshot, _) => User.fromMap(snapshot.data()!),
+            fromFirestore: (snapshot, _) => User.fromSnapshot(snapshot),
             toFirestore: (user, _) => user.toMap(),
           );
 
   Stream<User?> getUserStream(String userId) {
+    if (userId.isEmpty) {
+      return Stream.value(null);
+    }
     return _usersCollection.doc(userId).snapshots().map((snapshot) {
       if (snapshot.exists) {
         return snapshot.data();
@@ -27,92 +29,49 @@ class UserRepository {
     });
   }
 
+  Future<void> createUser(User user) async {
+    await _usersCollection.doc(user.id).set(user);
+  }
+
+  Future<void> updateUser(User user) async {
+    await _usersCollection.doc(user.id).update(user.toMap());
+  }
+
   Future<void> updateProfilePicture(String userId, String imagePath) async {
-    try {
-      final file = File(imagePath);
-      // Create a reference to the location you want to upload to in Firebase Storage
-      final ref = _storage.ref('profile_pictures/$userId');
-
-      // Upload the file
-      final uploadTask = await ref.putFile(file);
-
-      // Get the download URL
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-
-      // Update the user's profileImageUrl in Firestore
-      await _usersCollection.doc(userId).update({'profileImageUrl': downloadUrl});
-    } catch (e, s) {
-      log("Error al actualizar la foto de perfil", error: e, stackTrace: s, name: 'UserRepository');
-      throw Exception('Error al actualizar la foto de perfil.');
-    }
+    final file = File(imagePath);
+    final ref = _storage.ref('profile_pictures/$userId.jpg');
+    await ref.putFile(file);
+    final url = await ref.getDownloadURL();
+    await _usersCollection.doc(userId).update({'profileImageUrl': url});
   }
 
-  Future<void> followUser(String currentUserId, String targetUserId) async {
-    try {
-      final currentUserRef = _usersCollection.doc(currentUserId);
-      final targetUserRef = _usersCollection.doc(targetUserId);
-
-      await _firestore.runTransaction((transaction) async {
-        // Add target to current user's following list
-        transaction.update(currentUserRef, {
-          'following': FieldValue.arrayUnion([targetUserId])
-        });
-        // Add current user to target's followers list
-        transaction.update(targetUserRef, {
-          'followers': FieldValue.arrayUnion([currentUserId])
-        });
+  Future<void> followUser(String currentUserId, String userIdToFollow) async {
+    await _firestore.runTransaction((transaction) async {
+      transaction.update(_usersCollection.doc(currentUserId), {
+        'following': FieldValue.arrayUnion([userIdToFollow])
       });
-    } catch (e, s) {
-      log("Error al seguir al usuario", error: e, stackTrace: s, name: 'UserRepository');
-      throw Exception('Error al seguir al usuario.');
-    }
-  }
-
-  Future<void> unfollowUser(String currentUserId, String targetUserId) async {
-    try {
-      final currentUserRef = _usersCollection.doc(currentUserId);
-      final targetUserRef = _usersCollection.doc(targetUserId);
-
-      await _firestore.runTransaction((transaction) async {
-        // Remove target from current user's following list
-        transaction.update(currentUserRef, {
-          'following': FieldValue.arrayRemove([targetUserId])
-        });
-        // Remove current user from target's followers list
-        transaction.update(targetUserRef, {
-          'followers': FieldValue.arrayRemove([currentUserId])
-        });
+      transaction.update(_usersCollection.doc(userIdToFollow), {
+        'followers': FieldValue.arrayUnion([currentUserId])
       });
-    } catch (e, s) {
-      log("Error al dejar de seguir al usuario", error: e, stackTrace: s, name: 'UserRepository');
-      throw Exception('Error al dejar de seguir al usuario.');
-    }
+    });
   }
-  
-  Future<void> toggleFavorite(String userId, String postId) async {
-    final userRef = _usersCollection.doc(userId);
 
-    try {
-      final doc = await userRef.get();
-      if (doc.exists) {
-        final user = doc.data()!;
-        List<String> favorites = List.from(user.favorites);
+  Future<void> unfollowUser(String currentUserId, String userIdToUnfollow) async {
+    await _firestore.runTransaction((transaction) async {
+      transaction.update(_usersCollection.doc(currentUserId), {
+        'following': FieldValue.arrayRemove([userIdToUnfollow])
+      });
+      transaction.update(_usersCollection.doc(userIdToUnfollow), {
+        'followers': FieldValue.arrayRemove([currentUserId])
+      });
+    });
+  }
 
-        if (favorites.contains(postId)) {
-          userRef.update({
-            'favorites': FieldValue.arrayRemove([postId])
-          });
-        } else {
-          userRef.update({
-            'favorites': FieldValue.arrayUnion([postId])
-          });
-        }
-      } else {
-        log("El usuario con ID $userId no fue encontrado.", name: 'UserRepository');
-      }
-    } catch (e, s) {
-      log("Error al actualizar los favoritos", error: e, stackTrace: s, name: 'UserRepository');
-      throw Exception('Error al actualizar los favoritos.');
-    }
+  Future<void> toggleFavorite(String userId, String postId, bool isCurrentlyFavorited) async {
+    await _usersCollection.doc(userId).update({
+      'favorites': isCurrentlyFavorited
+          ? FieldValue.arrayRemove([postId])
+          : FieldValue.arrayUnion([postId]),
+    });
   }
 }

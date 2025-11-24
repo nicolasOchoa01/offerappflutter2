@@ -1,11 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 @immutable
 class User {
-  final String id; // Standardized to use 'id'
+  final String id;
   final String username;
   final String email;
-  final String? profileImageUrl; // Made nullable for consistency
+  final String? profileImageUrl;
   final List<String> followers;
   final List<String> following;
   final List<String> favorites;
@@ -20,12 +21,25 @@ class User {
     this.favorites = const [],
   });
 
+  factory User.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data() ?? {};
+    return User(
+      id: snapshot.id,
+      username: data['username'] ?? '',
+      email: data['email'] ?? '',
+      profileImageUrl: data['profileImageUrl'],
+      followers: List<String>.from(data['followers'] ?? []),
+      following: List<String>.from(data['following'] ?? []),
+      favorites: List<String>.from(data['favorites'] ?? []),
+    );
+  }
+
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['id'] ?? '', // Reads 'id'
+      id: map['id'] ?? '',
       username: map['username'] ?? '',
       email: map['email'] ?? '',
-      profileImageUrl: map['profileImageUrl'], // Can be null
+      profileImageUrl: map['profileImageUrl'],
       followers: List<String>.from(map['followers'] ?? []),
       following: List<String>.from(map['following'] ?? []),
       favorites: List<String>.from(map['favorites'] ?? []),
@@ -34,7 +48,6 @@ class User {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id, // Writes 'id'
       'username': username,
       'email': email,
       'profileImageUrl': profileImageUrl,
