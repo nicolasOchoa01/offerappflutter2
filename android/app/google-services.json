@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "34389981525",
+    "project_id": "offerapp2",
+    "storage_bucket": "offerapp2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34389981525:android:0ed2eb1fb1f582b08197dc",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6gWg_hSbrshMP98V-zaBlpNejak5AJ38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34389981525:android:748f730e07df862d8197dc",
+        "android_client_info": {
+          "package_name": "om.example.OfferApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6gWg_hSbrshMP98V-zaBlpNejak5AJ38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
