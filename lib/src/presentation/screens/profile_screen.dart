@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
@@ -7,7 +8,7 @@ import 'package:myapp/src/data/repositories/user_repository.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
 import 'package:myapp/src/domain/entities/post.dart';
 import 'package:myapp/src/domain/entities/user.dart';
-import 'package:myapp/src/presentation/screens/post_detail_screen.dart';
+import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:myapp/src/presentation/widgets/post_card.dart';
 import 'package:provider/provider.dart';
 
@@ -45,15 +46,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _isMyProfile = authRepo.currentUser?.uid == widget.userId;
     _tabController = TabController(length: _isMyProfile ? 3 : 2, vsync: this);
 
-    if (authRepo.currentUser != null) {
-      context.read<UserRepository>().getUserStream(authRepo.currentUser!.uid).listen((user) {
-        if (mounted) {
-          setState(() {
-            _currentUser = user;
-          });
-        }
-      });
-    }
+    // Listen to user changes to get the domain User object
+    authRepo.userChanges.listen((user) {
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+        });
+      }
+    });
   }
 
   @override
@@ -66,63 +66,77 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final userRepo = context.read<UserRepository>();
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
-    if (image != null && _isMyProfile) {
+    if (image != null && _isMyProfile && mounted) {
       await userRepo.updateProfilePicture(widget.userId, image.path);
     }
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     final userRepo = context.watch<UserRepository>();
-    final postRepo = context.watch<PostRepository>();
+    final authRepo = context.watch<AuthRepository>();
 
-    return StreamBuilder<User?>(
-      stream: userRepo.getUserStream(widget.userId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const Center(child: Text('Usuario no encontrado.'));
-        }
+    return Scaffold(
+      appBar: CustomHeader(
+        username: _currentUser?.username ?? "",
+        title: _isMyProfile ? "Mi Perfil" : null,
+        onBackClicked: GoRouter.of(context).canPop() ? () => GoRouter.of(context).pop() : null,
+        onProfileClick: () => context.go('/profile'),
+        onSessionClicked: () => authRepo.signOut(),
+      ),
+      body: StreamBuilder<User?>(
+        stream: userRepo.getUserStream(widget.userId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+            return const Center(child: Text('Usuario no encontrado.'));
+          }
 
-        final profileUser = snapshot.data!;
+          final profileUser = snapshot.data!;
 
-        return NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverToBoxAdapter(
-                child: _buildProfileHeader(context, profileUser),
-              ),
-              SliverPersistentHeader(
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    tabs: _isMyProfile
-                        ? const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment)), Tab(icon: Icon(Icons.favorite))]
-                        : const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment))],
-                  ),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: _buildProfileHeader(context, profileUser),
                 ),
-                pinned: true,
-              ),
-            ];
-          },
-          body: TabBarView(
-            controller: _tabController,
-            children: _isMyProfile
-                ? [
-                    _buildPostsTab(postRepo, profileUser.id),
-                    _buildCommentsTab(context, postRepo, profileUser.id),
-                    _buildFavoritesTab(postRepo, profileUser),
-                  ]
-                : [
-                    _buildPostsTab(postRepo, profileUser.id),
-                    _buildCommentsTab(context, postRepo, profileUser.id),
-                  ],
-          ),
-        );
-      },
+                SliverPersistentHeader(
+                  delegate: _SliverAppBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      tabs: _isMyProfile
+                          ? const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment)), Tab(icon: Icon(Icons.favorite))]
+                          : const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment))],
+                    ),
+                  ),
+                  pinned: true,
+                ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: _buildTabs(context, profileUser),
+            ),
+          );
+        },
+      ),
     );
+  }
+
+  List<Widget> _buildTabs(BuildContext context, User profileUser) {
+    final postRepo = context.read<PostRepository>();
+    final tabs = <Widget>[
+      _buildPostsTab(postRepo, profileUser.id),
+      _buildCommentsTab(context, postRepo, profileUser.id),
+    ];
+
+    if (_isMyProfile) {
+      tabs.add(_buildFavoritesTab(postRepo, profileUser));
+    }
+
+    return tabs;
   }
 
   Widget _buildProfileHeader(BuildContext context, User profileUser) {
@@ -168,10 +182,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
           const SizedBox(height: 16),
           if (!_isMyProfile && _currentUser != null)
-            StreamBuilder<User?>(
+             StreamBuilder<User?>(
               stream: context.read<UserRepository>().getUserStream(_currentUser!.id),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox.shrink();
+               builder: (context, snapshot) {
+                 if (!snapshot.hasData) return const SizedBox.shrink();
                 final isFollowing = snapshot.data!.following.contains(profileUser.id);
 
                 return ElevatedButton(
@@ -202,9 +216,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
         return ListView.builder(
           itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(post: posts[index], onClick: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(post: posts[index])));
-          }),
+          itemBuilder: (context, index) => PostCard(
+            post: posts[index],
+            onClick: () => context.push('/post/${posts[index].id}', extra: posts[index]),
+          ),
         );
       },
     );
@@ -223,9 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           itemBuilder: (context, index) => ProfileCommentItem(
             comment: comments[index],
             postRepo: postRepo,
-            onTap: (post) {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)));
-            },
+            onTap: (post) => context.push('/post/${post.id}', extra: post),
           ),
         );
       },
@@ -242,9 +255,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
         return ListView.builder(
           itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(post: posts[index], onClick: () {
-             Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(post: posts[index])));
-          }),
+          itemBuilder: (context, index) => PostCard(
+            post: posts[index],
+            onClick: () => context.push('/post/${posts[index].id}', extra: posts[index]),
+          ),
         );
       },
     );
@@ -303,75 +317,73 @@ class ProfileCommentItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Post?>(
-        future: postRepo.getPostFuture(comment.postId),
-        builder: (context, postSnapshot) {
-            final post = postSnapshot.data;
-            final sdf = DateFormat('dd MMM yyyy', 'es_ES');
+      future: postRepo.getPostFuture(comment.postId),
+      builder: (context, postSnapshot) {
+        final post = postSnapshot.data;
+        final sdf = DateFormat('dd MMM yyyy', 'es_ES');
 
-            return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: InkWell(
-                    onTap: post != null ? () => onTap(post) : null,
-                    child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                                if (post != null)
-                                    Row(
-                                        children: [
-                                            Image.network(post.imageUrl, width: 40, height: 40, fit: BoxFit.cover),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                "En respuesta a: ${post.description}",
-                                                style: Theme.of(context).textTheme.bodySmall,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                        ],
-                                    ),
-                                if (post != null) const Divider(),
-                                Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                        CircleAvatar(
-                                            radius: 20,
-                                            backgroundImage: comment.user?.profileImageUrl != null
-                                                ? NetworkImage(comment.user!.profileImageUrl!)
-                                                : null,
-                                            child: comment.user?.profileImageUrl == null
-                                                ? const Icon(Icons.person)
-                                                : null,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                            child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                    Text(comment.user?.username ?? 'Anónimo', style: Theme.of(context).textTheme.titleMedium),
-                                                    const SizedBox(height: 4),
-                                                    Text(comment.text, style: Theme.of(context).textTheme.bodyMedium),
-                                                ],
-                                            )
-                                        )
-                                    ],
-                                ),
-                                 if (comment.timestamp != null)
-                                  Align(
-                                    alignment: Alignment.bottomRight,
-                                    child: Text(
-                                        sdf.format(comment.timestamp!.toDate()),
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                  )
-                            ],
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: InkWell(
+            onTap: post != null ? () => onTap(post) : null,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (post != null)
+                    Row(
+                      children: [
+                        Image.network(post.imageUrl, width: 40, height: 40, fit: BoxFit.cover),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "En respuesta a: ${post.description}",
+                            style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                      ],
                     ),
-                ),
-            );
-        }
+                  if (post != null) const Divider(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundImage: comment.user?.profileImageUrl != null
+                            ? NetworkImage(comment.user!.profileImageUrl!)
+                            : null,
+                        child: comment.user?.profileImageUrl == null ? const Icon(Icons.person) : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(comment.user?.username ?? 'Anónimo', style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 4),
+                            Text(comment.text, style: Theme.of(context).textTheme.bodyMedium),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
+                  if (comment.timestamp != null)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Text(
+                        sdf.format(comment.timestamp!.toDate()),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

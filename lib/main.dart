@@ -5,7 +5,7 @@ import 'package:myapp/firebase_options.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/data/repositories/user_repository.dart';
-import 'package:myapp/src/presentation/screens/main_screen.dart';
+import 'package:myapp/src/navigation/app_router.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -34,13 +34,20 @@ class MyApp extends StatelessWidget {
           create: (_) => UserRepository(),
         ),
       ],
-      child: MaterialApp(
-        title: 'OfferApp',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        home: const MainScreen(),
+      child: Builder(
+        builder: (context) {
+          final authRepository = context.watch<AuthRepository>();
+          final appRouter = AppRouter(authRepository: authRepository);
+
+          return MaterialApp.router(
+            title: 'OfferApp',
+            theme: ThemeData(
+              primarySwatch: Colors.blue,
+              visualDensity: VisualDensity.adaptivePlatformDensity,
+            ),
+            routerConfig: appRouter.router,
+          );
+        }
       ),
     );
   }

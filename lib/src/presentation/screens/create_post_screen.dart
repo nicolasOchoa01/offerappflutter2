@@ -2,11 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/domain/entities/user.dart';
-import 'package:myapp/src/presentation/screens/profile_screen.dart';
 import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:provider/provider.dart';
 
@@ -182,7 +182,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       });
     }
 
-    final navigator = Navigator.of(context);
+    final router = GoRouter.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final postRepository = context.read<PostRepository>();
 
@@ -201,7 +201,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           );
       
       scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Publicación creada con éxito')));
-      navigator.pop();
+      router.pop();
     } catch (e) {
       scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error al crear la publicación: $e')));
     } finally {
@@ -242,13 +242,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       appBar: CustomHeader(
         username: widget.user.username,
         title: 'Crear Publicación',
-        onBackClicked: () => Navigator.of(context).pop(),
+        onBackClicked: () => context.pop(),
         onProfileClick: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(userId: widget.user.id)));
+          context.go('/profile/${widget.user.id}');
         },
         onSessionClicked: () {
           context.read<AuthRepository>().signOut();
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          context.go('/login');
         },
       ),
       body: _isLoading
