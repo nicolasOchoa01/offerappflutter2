@@ -39,6 +39,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   void dispose() {
     _commentController.dispose();
     _tabController.dispose();
+    context.read<MainNotifier>().selectPost(null);
     super.dispose();
   }
 
@@ -65,7 +66,9 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         title: Text(post.description, overflow: TextOverflow.ellipsis),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            context.pop();
+          },
         ),
         bottom: TabBar(
           controller: _tabController,
