@@ -20,7 +20,7 @@ class AuthRepository {
   })  : _auth = auth ?? firebase_auth.FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
         _cloudinary = cloudinary ??
-            CloudinaryPublic('dextwzsqv', 'unsigned-upload-preset', cache: false),
+            CloudinaryPublic('dyloasili', 'ml_default', cache: false),
         _authService = authService ?? FirebaseAuthService();
 
   CollectionReference<User> get _usersCollection =>

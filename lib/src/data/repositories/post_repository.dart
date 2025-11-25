@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
 import 'package:myapp/src/domain/entities/post.dart';
 import 'package:myapp/src/domain/entities/user.dart';
 
 class PostRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final CloudinaryPublic _cloudinary = CloudinaryPublic('dyloasili', 'ml_default', cache: false);
 
   // Helper to fetch a User object
   Future<User?> _fetchUser(String userId) async {
@@ -71,17 +71,32 @@ class PostRepository {
 
   Future<void> addPost({required Post post, required File imageFile}) async {
     final docRef = _firestore.collection('posts').doc();
-    final imageUrl = await _uploadImage(docRef.id, imageFile);
-    await docRef.set(post.copyWith(id: docRef.id, imageUrl: imageUrl).toMap());
+    final imageUrl = await _uploadImageToCloudinary(imageFile);
+
+    // Manually create the map to ensure no nested User object is saved.
+    final postData = {
+      'userId': post.userId,
+      'description': post.description,
+      'imageUrl': imageUrl, // Use the URL from storage
+      'location': post.location,
+      'latitude': post.latitude,
+      'longitude': post.longitude,
+      'category': post.category,
+      'price': post.price,
+      'discountPrice': post.discountPrice,
+      'store': post.store,
+      'timestamp': FieldValue.serverTimestamp(), // Use server timestamp for reliability
+      'status': post.status,
+      'scores': [],
+    };
+
+    await docRef.set(postData);
   }
 
   Future<void> deletePost(String postId) async {
     await _firestore.collection('posts').doc(postId).delete();
-    try {
-      await _storage.ref('post_images/$postId').delete();
-    } catch (e) {
-      // May fail if image doesn't exist, ignore.
-    }
+    // Note: Deleting from Cloudinary would require knowing the public_id, 
+    // which we are not storing. If needed, this functionality would have to be added.
   }
 
     Future<void> updatePostDetails({
@@ -101,10 +116,15 @@ class PostRepository {
     });
   }
 
-  Future<String> _uploadImage(String postId, File image) async {
-    final ref = _storage.ref('post_images/$postId');
-    await ref.putFile(image);
-    return await ref.getDownloadURL();
+  Future<String> _uploadImageToCloudinary(File imageFile) async {
+     try {
+      CloudinaryResponse response = await _cloudinary.uploadFile(
+        CloudinaryFile.fromFile(imageFile.path, resourceType: CloudinaryResourceType.Image),
+      );
+      return response.secureUrl;
+    } catch (e) {
+      throw Exception('Error al subir la imagen: ${e.toString()}');
+    }
   }
   
   Stream<List<Comment>> getCommentsStream(String postId) {
