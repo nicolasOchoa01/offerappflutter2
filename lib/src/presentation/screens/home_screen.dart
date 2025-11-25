@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
               isFavorite: isFavorite,
               onToggleFavorite: () => mainNotifier.toggleFavorite(post.id),
               onClick: () {
-                context.go('/post/${post.id}', extra: post);
+                context.push('/post/${post.id}', extra: post);
               },
             );
           },
