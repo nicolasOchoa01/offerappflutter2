@@ -31,7 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _setupTabController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MainNotifier>().loadUserProfile(widget.userId);
-      context.read<MainNotifier>().refreshPosts();
     });
   }
 
@@ -131,21 +130,28 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       ),
       body: profileUser == null
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-            children: [
-              _buildProfileHeader(context, notifier, profileUser, isMyProfile),
-              TabBar(
-                  controller: _tabController,
-                  tabs: _buildTabs(isMyProfile),
+          : NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return <Widget>[
+                  SliverToBoxAdapter(
+                    child: _buildProfileHeader(context, notifier, profileUser, isMyProfile),
+                  ),
+                  SliverPersistentHeader(
+                    delegate: _SliverAppBarDelegate(
+                      TabBar(
+                        controller: _tabController,
+                        tabs: _buildTabs(isMyProfile),
+                      ),
+                    ),
+                    pinned: true,
+                  ),
+                ];
+              },
+              body: TabBarView(
+                controller: _tabController,
+                children: _buildTabViews(notifier, isMyProfile, context),
               ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: _buildTabViews(notifier, isMyProfile, context),
-                ),
-              ),
-            ],
-          )
+            ),
     );
   }
 
@@ -169,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       ),
     ];
     if (isMyProfile) {
-      views.add(_PostListView(posts: notifier.favoritePosts, notifier: notifier));
+      views.add(_PostListView(posts: notifier.profileUserFavorites, notifier: notifier));
     }
     return views;
   }
@@ -221,6 +227,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 }
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
+}
+
 
 class _StatColumn extends StatelessWidget {
   final int count;

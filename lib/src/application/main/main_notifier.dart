@@ -59,6 +59,12 @@ class MainNotifier with ChangeNotifier {
   User? _profileUser;
   User? get profileUser => _profileUser;
 
+  List<Post> _profileUserPosts = [];
+  List<Post> get profileUserPosts => _profileUserPosts;
+
+  List<Post> _profileUserFavorites = [];
+  List<Post> get profileUserFavorites => _profileUserFavorites;
+
   List<Comment> _profileUserComments = [];
   List<Comment> get profileUserComments => _profileUserComments;
 
@@ -72,16 +78,6 @@ class MainNotifier with ChangeNotifier {
   List<Post> get myPosts => _allPosts.where((p) => p.user?.id == _user.id).toList();
   List<Post> get favoritePosts =>
       _allPosts.where((p) => _user.favorites.contains(p.id)).toList();
-  
-  List<Post> get profileUserPosts {
-    if (_profileUser == null) return [];
-    return _allPosts.where((p) => p.user?.id == _profileUser!.id).toList();
-  }
-  
-  List<Post> get profileUserFavorites {
-    if (_profileUser == null) return [];
-    return _allPosts.where((p) => _profileUser!.favorites.contains(p.id)).toList();
-  }
 
   Post? getPostById(String postId) {
     try {
@@ -89,6 +85,10 @@ class MainNotifier with ChangeNotifier {
     } catch (e) {
       return null;
     }
+  }
+
+  Future<List<User>> getUsersByIds(List<String> userIds) {
+    return _authRepository.getUsers(userIds);
   }
 
   MainNotifier(this._user, this._postRepository, this._authRepository) {
@@ -186,15 +186,25 @@ class MainNotifier with ChangeNotifier {
 
     _profileCommentsSubscription?.cancel();
     _profileUser = null;
+    _profileUserPosts = [];
+    _profileUserFavorites = [];
     _profileUserComments = [];
     notifyListeners();
 
     try {
+      // Fetch the user profile
       final profileToLoad = userId == _user.id ? _user : await _authRepository.getUser(userId);
       _profileUser = profileToLoad;
 
       if (profileToLoad != null) {
-        _profileCommentsSubscription = _postRepository.getCommentsStream(userId).listen((comments) {
+        // Fetch posts for the profile user
+        _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
+
+        // Fetch favorite posts for the profile user
+        _profileUserFavorites = await _postRepository.getFavoritePosts(profileToLoad.favorites);
+
+        // Start listening to comments
+        _profileCommentsSubscription = _postRepository.getCommentsStream(profileToLoad.id).listen((comments) {
             _profileUserComments = comments;
             notifyListeners();
         });
@@ -206,6 +216,7 @@ class MainNotifier with ChangeNotifier {
     }
     notifyListeners();
   }
+
 
    Future<void> refreshCurrentUser() async {
     try {
@@ -266,7 +277,7 @@ class MainNotifier with ChangeNotifier {
 
     Future<void> addComment(String postId, String text) async {
         try {
-            await _postRepository.addComment(postId: postId, text: text, userId: _user.id, user: _user);
+            await _postRepository.addComment(postId: postId, text: text, userId: _user.id);
         } catch (e) {
             if (kDebugMode) {
                 print("Error adding comment: $e");
