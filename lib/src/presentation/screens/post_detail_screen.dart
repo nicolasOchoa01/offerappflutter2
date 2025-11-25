@@ -24,14 +24,16 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _commentController = TextEditingController();
   late TabController _tabController;
+  late MainNotifier _mainNotifier; // Variable para guardar la referencia
   bool _isMapInteracting = false;
 
   @override
   void initState() {
     super.initState();
+    _mainNotifier = context.read<MainNotifier>(); // Referencia guardada de forma segura
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MainNotifier>().selectPost(widget.post.id);
+      _mainNotifier.selectPost(widget.post.id); // Usamos la referencia
     });
   }
 
@@ -39,7 +41,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   void dispose() {
     _commentController.dispose();
     _tabController.dispose();
-    context.read<MainNotifier>().selectPost(null);
+    _mainNotifier.selectPost(null); // Usamos la referencia para evitar el error
     super.dispose();
   }
 

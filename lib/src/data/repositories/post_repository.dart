@@ -8,7 +8,7 @@ import 'package:myapp/src/domain/entities/user.dart';
 
 class PostRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final CloudinaryPublic _cloudinary = CloudinaryPublic('dyloasili', 'ml_default', cache: false);
+  final CloudinaryPublic _cloudinary = CloudinaryPublic('ml_default', 'dyloasili', cache: false);
 
   // Helper to fetch a User object
   Future<User?> _fetchUser(String userId) async {
@@ -137,6 +137,15 @@ class PostRepository {
         .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildCommentFromDoc)));
   }
 
+  Stream<List<Comment>> getCommentsForUserStream(String userId) {
+  return _firestore
+      .collectionGroup('comments')
+      .where('userId', isEqualTo: userId)
+      .orderBy('timestamp', descending: true)
+      .snapshots()
+      .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildCommentFromDoc)));
+  }
+
   Future<void> addComment({required String postId, required String text, required String userId}) async {
     final commentRef = _firestore.collection('posts').doc(postId).collection('comments').doc();
     final user = await _fetchUser(userId);
@@ -178,11 +187,14 @@ class PostRepository {
   }
 
   Future<List<Post>> getPostsForUser(String userId) async {
+    // This query fetches ALL posts for a specific user, ordered by date.
+    // It does not use any in-memory list and is not paginated.
     final snapshot = await _firestore
         .collection('posts')
         .where('userId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .get();
+    // We then build the list of Post objects from the documents.
     return Future.wait(snapshot.docs.map(_buildPostFromDoc));
   }
 
@@ -190,6 +202,8 @@ class PostRepository {
     if (postIds.isEmpty) return [];
 
     List<Post> favoritePosts = [];
+    // Firestore 'in' query is limited to 30 items per query.
+    // We loop through the postIds in chunks of 30.
     for (var i = 0; i < postIds.length; i += 30) {
       final sublist = postIds.sublist(i, i + 30 > postIds.length ? postIds.length : i + 30);
       final snapshot = await _firestore
@@ -197,7 +211,10 @@ class PostRepository {
           .where(FieldPath.documentId, whereIn: sublist)
           .get();
       
-      final posts = await Future.wait(snapshot.docs.map(_buildPostFromDoc));
+      final posts = await Future.wait(snapshot.docs.map((doc) async {
+        final post = await _buildPostFromDoc(doc);
+        return post;
+      }));
       favoritePosts.addAll(posts);
     }
     
