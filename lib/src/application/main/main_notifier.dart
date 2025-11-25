@@ -24,14 +24,12 @@ class MainNotifier with ChangeNotifier {
   String _searchQuery = "";
   String get searchQuery => _searchQuery;
 
-  // FIX: Made final as its value is never changed.
   final String _selectedCategory = "Todos";
   String get selectedCategory => _selectedCategory;
 
   int _selectedFeedTab = 0;
   int get selectedFeedTab => _selectedFeedTab;
 
-  // FIX: Made final as its value is never changed.
   final String _currentSortOption = "Fecha (más recientes)";
   String get currentSortOption => _currentSortOption;
 
@@ -46,9 +44,14 @@ class MainNotifier with ChangeNotifier {
   bool? _isDarkTheme;
   bool? get isDarkTheme => _isDarkTheme;
 
-  Post? get selectedPost => _selectedPostId != null
-      ? _allPosts.firstWhere((p) => p.id == _selectedPostId)
-      : null;
+  Post? get selectedPost {
+    if (_selectedPostId == null) return null;
+    try {
+      return _allPosts.firstWhere((p) => p.id == _selectedPostId);
+    } catch (e) {
+      return null; 
+    }
+  }
 
   List<Comment> _comments = [];
   List<Comment> get comments => _comments;
@@ -272,11 +275,10 @@ class MainNotifier with ChangeNotifier {
   }) async {
     try {
       final newPost = Post(
-        id: '', // Firestore generates this
-        // FIX: Added the required userId parameter.
+        id: '', 
         userId: _user.id,
         description: description,
-        imageUrl: '', // The repository will fill this after upload
+        imageUrl: '', 
         location: location,
         latitude: latitude,
         longitude: longitude,
@@ -284,7 +286,7 @@ class MainNotifier with ChangeNotifier {
         price: price,
         discountPrice: discountPrice,
         store: store,
-        user: _user, // User from the notifier
+        user: _user, 
         timestamp: Timestamp.now(),
         status: 'Activa',
         scores: [],
@@ -292,18 +294,60 @@ class MainNotifier with ChangeNotifier {
       
       await _postRepository.addPost(post: newPost, imageFile: imageFile);
       
-      // Refresh the post list to show the new post immediately.
       refreshPosts();
     } catch (e) {
       if (kDebugMode) {
         print('Error adding post: $e');
       }
-      // Rethrow the error to be caught by the UI.
       rethrow;
     }
   }
 
-    void toggleFavorite(String postId) {
+  Future<void> deletePost(String postId) async {
+    try {
+      await _postRepository.deletePost(postId);
+      _allPosts.removeWhere((p) => p.id == postId);
+      _applyFilters();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting post: $e');
+      }
+    }
+  }
+
+  Future<void> updatePostDetails(
+    String postId,
+    String description,
+    double price,
+    double discountPrice,
+    String category,
+    String store,
+  ) async {
+    try {
+      await _postRepository.updatePostDetails(
+        postId: postId,
+        description: description,
+        price: price,
+        discountPrice: discountPrice,
+        category: category,
+        store: store,
+      );
+      final updatedPost = await _postRepository.getPostFuture(postId);
+      if (updatedPost != null) {
+        final index = _allPosts.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          _allPosts[index] = updatedPost;
+          _applyFilters();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating post details: $e');
+      }
+    }
+  }
+
+  void toggleFavorite(String postId) {
       final isCurrentlyFavorite = _user.favorites.contains(postId);
       final originalFavorites = List<String>.from(_user.favorites);
 
@@ -334,13 +378,12 @@ class MainNotifier with ChangeNotifier {
         userId: _user.id,
         value: value,
       );
-      // After voting, fetch the updated post to reflect the new score
       final updatedPost = await _postRepository.getPostFuture(postId);
       if (updatedPost != null) {
         final postIndex = _allPosts.indexWhere((p) => p.id == postId);
         if (postIndex != -1) {
           _allPosts[postIndex] = updatedPost;
-          _applyFilters(); // This will rebuild the list and notify listeners
+          _applyFilters(); 
         }
       }
     } catch (e) {
