@@ -165,7 +165,15 @@ class MainNotifier with ChangeNotifier {
     } else {
       _commentsSubscription?.cancel();
     }
-    notifyListeners();
+
+    if (postId == null) {
+      // When deselecting a post (from dispose), schedule the notification
+      // to prevent calling it while the widget tree is locked.
+      Future.microtask(notifyListeners);
+    } else {
+      // Otherwise, notify immediately.
+      notifyListeners();
+    }
   }
 
   void _loadComments(String postId) {
