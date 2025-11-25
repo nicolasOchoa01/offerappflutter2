@@ -1,75 +1,51 @@
-# Blueprint: Refactorización de Repositorios e Implementación de Notifiers
+# Blueprint: Aplicación de Ofertas
 
 ## Visión General
 
-El objetivo es alinear la arquitectura de la aplicación Flutter con la de la app nativa. Se refactorizaron los repositorios de datos y ahora se implementará la capa de lógica de negocio utilizando el patrón `ChangeNotifier` con `provider`, que es el equivalente al patrón ViewModel utilizado en la versión de Kotlin.
+El objetivo de este proyecto es construir una aplicación móvil completa con Flutter y Firebase que permita a los usuarios descubrir y compartir ofertas. La arquitectura sigue un patrón MVVM (Model-View-ViewModel) utilizando `ChangeNotifier` como el componente principal para la lógica de negocio, sirviendo como un ViewModel.
 
-## Fase 1: Refactorización de Repositorios (Completada)
+## Arquitectura y Componentes Clave
 
-- Se reescribieron `AuthRepository` y `PostRepository` para que su estructura y lógica sean una réplica fiel de las implementaciones nativas.
+-   **Provider (`ChangeNotifier`)**: Es el corazón de la gestión de estado. Los `Notifiers` (`AuthNotifier`, `MainNotifier`, `ThemeNotifier`) exponen el estado y la lógica de negocio a la UI.
+-   **Repositorios (`AuthRepository`, `PostRepository`)**: Capa de acceso a datos que interactúa directamente con Firebase (Firestore) y otros servicios como Cloudinary. Abstrae el origen de los datos.
+-   **GoRouter**: Gestiona la navegación y el enrutamiento de la aplicación, permitiendo una navegación declarativa y manejo de enlaces profundos.
+-   **Firebase**: Utilizado para autenticación de usuarios (Authentication) y como base de datos en tiempo real (Firestore).
+-   **Cloudinary**: Servicio externo para el almacenamiento y la gestión de imágenes.
 
-## Fase 2: Implementación de la Lógica de Negocio (ViewModels/Notifiers)
+## Estado Actual y Funcionalidades Implementadas
 
-### 1. Crear `SessionManager`
+-   **Autenticación**: Flujo completo de registro, inicio de sesión y cierre de sesión.
+-   **Feed Principal**: Muestra una lista de todas las publicaciones (ofertas) con scroll infinito.
+-   **Creación de Posts**: Los usuarios pueden crear nuevas publicaciones con imagen, descripción, precio, etc.
+-   **Detalle de Post**: Vista detallada para cada publicación, incluyendo sus comentarios.
+-   **Perfiles de Usuario**: Pantalla de perfil donde se muestran las publicaciones, comentarios y favoritos de un usuario.
+-   **Lógica de "Seguir"**: Los usuarios pueden seguirse entre sí.
+-   **Gestión de Favoritos**: Los usuarios pueden marcar publicaciones como favoritas.
 
--   **Archivo:** `lib/src/data/services/session_manager.dart`
--   **Propósito:** Gestionar el estado de la sesión y las preferencias del usuario de forma persistente.
--   **Dependencia:** Se añadirá `shared_preferences` al `pubspec.yaml`.
--   **Funcionalidad:**
-    -   Guardar/leer el estado de `isLoggedIn`.
-    -   Guardar/leer la preferencia del tema (`isDarkMode`).
-    -   Exponer `Streams` (equivalentes a `Flow`) para escuchar cambios en estos valores.
+## Problema Actual: Datos no se muestran en el perfil
 
-### 2. Crear `AuthNotifier` (Equivalente a `AuthViewModel`)
+Se ha diagnosticado que la pantalla de perfil (`profile_screen.dart`) no muestra las publicaciones, comentarios y favoritos del usuario a pesar de que los datos existen en la base de datos. La causa raíz no es un error en el código de la aplicación, sino una **configuración faltante en Firestore**.
 
--   **Archivo:** `lib/src/application/auth/auth_notifier.dart`
--   **Propósito:** Manejar toda la lógica y el estado relacionados con la autenticación.
--   **Estructura:**
-    -   Heredará de `ChangeNotifier`.
-    -   Dependerá de `AuthRepository` y `SessionManager`.
-    -   Se creará un archivo `auth_state.dart` para definir los diferentes estados (Idle, Loading, Success, Error).
--   **Funcionalidad:**
-    -   Métodos `login`, `register`, `logout`, `resetPassword`.
-    -   Gestión del estado de la UI (e.g., `_state.value = AuthState.Loading`).
-    -   Actualización del `SessionManager` tras un login/logout exitoso.
+### Diagnóstico
 
-### 3. Crear `ThemeNotifier` (Equivalente a `ThemeViewModel`)
+Las consultas requeridas para obtener los datos del perfil son compuestas, combinando una cláusula `where` (para filtrar por `userId`) con una cláusula `orderBy` (para ordenar por `timestamp`).
 
--   **Archivo:** `lib/src/application/theme/theme_notifier.dart`
--   **Propósito:** Gestionar el tema de la aplicación.
--   **Estructura:**
-    -   Heredará de `ChangeNotifier`.
-    -   Dependerá de `SessionManager`.
--   **Funcionalidad:**
-    -   Exponer el estado actual del tema (`isDarkMode`).
-    -   Método `setTheme` para cambiar y persistir la preferencia.
+-   `collection("posts").where("userId", "==").orderBy("timestamp")`
+-   `collectionGroup("comments").where("userId", "==").orderBy("timestamp")`
 
-### 4. Crear `MainNotifier` (Equivalente a `MainViewModel`)
+Firestore, por defecto, **no permite** este tipo de consultas sin un **índice compuesto** predefinido. Cuando la aplicación intenta ejecutar estas consultas, Firestore no devuelve ningún dato y emite un error silencioso en la consola de depuración del desarrollador. Este error contiene un enlace para crear el índice faltante.
 
--   **Archivo:** `lib/src/application/main/main_notifier.dart`
--   **Propósito:** Orquestar la lógica de negocio principal de la aplicación.
--   **Estructura:**
-    -   Heredará de `ChangeNotifier`.
-    -   Dependerá de `AuthRepository` y `PostRepository`.
--   **Funcionalidad:** Replicará todos los métodos y propiedades de `MainViewModel`, incluyendo:
-    -   Carga y paginación de posts (`loadMorePosts`, `refreshPosts`).
-    -   Gestión de posts (favoritos, de usuario, etc.).
-    -   Gestión de comentarios.
-    -   Lógica de perfiles de usuario (seguir, dejar de seguir).
-    -   Manejo de estado de carga, filtros y ordenación.
+### Solución
 
-### 5. Integración con `MultiProvider`
+Para resolver este problema, es necesario crear los índices requeridos en la consola de Firebase.
 
--   **Archivo:** `lib/main.dart`
--   **Acción:** Envolver el widget principal de la aplicación con `MultiProvider` para registrar e inyectar `AuthNotifier`, `ThemeNotifier` y `MainNotifier` en el árbol de widgets, haciéndolos accesibles para toda la UI.
+1.  **Ejecutar la aplicación en modo de depuración.**
+2.  **Navegar a la pantalla de perfil** de cualquier usuario.
+3.  **Abrir la "Debug Console"** en el IDE (VS Code, Android Studio, etc.).
+4.  **Localizar el mensaje de error de Firestore.** Será un mensaje largo que incluye texto como `FAILED_PRECONDITION: The query requires an index...`.
+5.  **Hacer clic en el enlace URL** que se proporciona dentro de ese mensaje de error. Este enlace abre la consola de Firebase directamente en la página de creación de índices con todos los campos necesarios ya rellenados.
+6.  **Hacer clic en el botón "Crear"** para confirmar la creación del índice.
+7.  **Repetir el proceso si es necesario.** Es probable que se necesiten dos índices: uno para la colección `posts` y otro para el `collectionGroup` de `comments`.
 
-## Pasos de Ejecución
+Una vez que los índices se hayan construido en Firebase (puede tardar unos minutos), la pantalla de perfil comenzará a mostrar los datos correctamente sin necesidad de realizar más cambios en el código.
 
-1.  Actualizar este archivo `blueprint.md`.
-2.  Añadir la dependencia `shared_preferences` a `pubspec.yaml`.
-3.  Crear `lib/src/data/services/session_manager.dart`.
-4.  Crear `lib/src/application/auth/auth_state.dart`.
-5.  Crear `lib/src/application/auth/auth_notifier.dart`.
-6.  Crear `lib/src/application/theme/theme_notifier.dart`.
-7.  Crear `lib/src/application/main/main_notifier.dart`.
-8.  Actualizar `lib/main.dart` para usar `MultiProvider`.
