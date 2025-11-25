@@ -4,15 +4,14 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:myapp/src/data/repositories/auth_repository.dart';
-import 'package:myapp/src/data/repositories/post_repository.dart';
-import 'package:myapp/src/domain/entities/user.dart';
+import 'package:myapp/src/application/auth/auth_notifier.dart';
+import 'package:myapp/src/application/main/main_notifier.dart';
 import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:provider/provider.dart';
 
 class CreatePostScreen extends StatefulWidget {
-  final User user;
-  const CreatePostScreen({super.key, required this.user});
+  // No longer needs the user passed in, as it will be fetched from the notifier.
+  const CreatePostScreen({super.key});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -184,21 +183,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     final router = GoRouter.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final postRepository = context.read<PostRepository>();
+    // Use read to call methods on the notifier, we don't need to watch here.
+    final mainNotifier = context.read<MainNotifier>();
 
     try {
-      await postRepository.addPost(
-            description: _descriptionController.text,
-            imageFile: _image!,
-            location: _location,
-            latitude: _latitude,
-            longitude: _longitude,
-            category: _selectedCategory!,
-            price: double.parse(_originalPriceController.text),
-            discountPrice: double.parse(_finalPriceController.text),
-            store: _storeController.text.isNotEmpty ? _storeController.text : 'desconocido',
-            user: widget.user, 
-          );
+      await mainNotifier.addPost(
+        description: _descriptionController.text,
+        imageFile: _image!,
+        location: _location,
+        latitude: _latitude,
+        longitude: _longitude,
+        category: _selectedCategory!,
+        price: double.parse(_originalPriceController.text),
+        discountPrice: double.parse(_finalPriceController.text),
+        store: _storeController.text.isNotEmpty ? _storeController.text : 'desconocido',
+      );
       
       scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Publicación creada con éxito')));
       router.pop();
@@ -225,6 +224,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the notifiers. Use read for actions, watch for rebuilds.
+    final mainNotifier = context.read<MainNotifier>();
+    final authNotifier = context.read<AuthNotifier>();
+
     final outlineInputBorder = OutlineInputBorder(
       borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
       borderRadius: BorderRadius.circular(8),
@@ -240,14 +243,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     return Scaffold(
       appBar: CustomHeader(
-        username: widget.user.username,
+        username: mainNotifier.user.username,
         title: 'Crear Publicación',
         onBackClicked: () => context.pop(),
         onProfileClick: () {
-          context.go('/profile/${widget.user.id}');
+          context.go('/profile/${mainNotifier.user.id}');
         },
         onSessionClicked: () {
-          context.read<AuthRepository>().signOut();
+          authNotifier.logout(); // Correctly call logout on AuthNotifier
           context.go('/login');
         },
       ),
@@ -273,7 +276,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _selectedPromotionType,
+                      // Use initialValue instead of the deprecated value
+                      initialValue: _selectedPromotionType,
                       hint: const Text('Tipo de Promoción'),
                       decoration: inputDecoration.copyWith(labelText: 'Tipo de Promoción'),
                       items: _promotionTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
@@ -332,7 +336,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _selectedCategory,
+                      // Use initialValue instead of the deprecated value
+                      initialValue: _selectedCategory,
                       hint: const Text('Categoría'),
                       decoration: inputDecoration.copyWith(labelText: 'Categoría'),
                       items: _categories.map((category) => DropdownMenuItem(value: category, child: Text(category))).toList(),

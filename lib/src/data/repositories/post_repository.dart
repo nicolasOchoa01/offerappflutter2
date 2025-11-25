@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
@@ -15,36 +16,94 @@ class PostRepository {
     FirebaseFirestore? firestore,
     CloudinaryPublic? cloudinary,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _cloudinary = cloudinary ??
-            CloudinaryPublic('dextwzsqv', 'unsigned-upload-preset', cache: false);
+        _cloudinary = cloudinary ?? CloudinaryPublic('dextwzsqv', 'unsigned-upload-preset', cache: false);
 
   CollectionReference<Post> get _postsCollection =>
       _firestore.collection('posts').withConverter<Post>(
-            fromFirestore: (snapshot, _) =>
-                Post.fromMap(snapshot.data()!, snapshot.id),
+            fromFirestore: (snapshot, _) => Post.fromMap(snapshot.data()!, snapshot.id),
             toFirestore: (post, _) => post.toMap(),
           );
 
-  Stream<Post> getPostStream(String postId) {
-    return _postsCollection
-        .doc(postId)
-        .snapshots()
-        .map((snapshot) => snapshot.data()!);
-  }
-
-  Stream<List<Post>> getPostsStream({String? category}) {
-    Query<Post> query = _postsCollection.orderBy('timestamp', descending: true);
-
-    if (category != null && category != "Todos") {
-      query = query.where('category', isEqualTo: category);
+  Future<String> _uploadImageToCloudinary(File imageFile) async {
+    try {
+      final response = await _cloudinary.uploadFile(
+        CloudinaryFile.fromFile(imageFile.path, resourceType: CloudinaryResourceType.Image),
+      );
+      return response.secureUrl;
+    } catch (e) {
+      throw Exception('Error al subir la imagen a Cloudinary: ${e.toString()}');
     }
-
-    return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => doc.data()).toList();
-    });
   }
 
-    Stream<List<Comment>> getCommentsStream(String postId) {
+  Future<void> addPost({required Post post, required File imageFile}) async {
+    try {
+      final imageUrl = await _uploadImageToCloudinary(imageFile);
+      final newPost = post.copyWith(imageUrl: imageUrl);
+      await _postsCollection.add(newPost);
+    } catch (e) {
+      throw Exception('Error al añadir el post: ${e.toString()}');
+    }
+  }
+
+  Future<void> updatePostScore({required String postId, required String userId, required int value}) async {
+    try {
+      final postRef = _postsCollection.doc(postId);
+      await _firestore.runTransaction((transaction) async {
+        final postSnapshot = await transaction.get(postRef);
+        final post = postSnapshot.data();
+        if (post == null) throw Exception("Post no encontrado");
+
+        if (post.status != "activa") {
+          throw Exception("El post no está activo, no se puede cambiar la puntuación.");
+        }
+
+        final newScores = List<Score>.from(post.scores);
+        final existingScoreIndex = newScores.indexWhere((s) => s.userId == userId);
+
+        if (existingScoreIndex != -1) {
+          if (newScores[existingScoreIndex].value == value) {
+            newScores.removeAt(existingScoreIndex); // User removes their vote
+          } else {
+            newScores[existingScoreIndex] = Score(userId: userId, value: value); // User changes vote
+          }
+        } else {
+          newScores.add(Score(userId: userId, value: value)); // New vote
+        }
+
+        transaction.update(postRef, {'scores': newScores.map((s) => s.toMap()).toList()});
+
+        final totalScore = newScores.fold<int>(0, (total, score) => total + score.value);
+        if (totalScore < -15) {
+          transaction.update(postRef, {'status': "vencida"});
+        }
+      });
+    } catch (e) {
+      throw Exception('Error al actualizar la puntuación: ${e.toString()}');
+    }
+  }
+
+  Future<void> addComment(
+      {required String postId, required String text, required String userId, required User user}) async {
+    try {
+      final comment = Comment(
+        id: '', // Firestore will generate it
+        postId: postId,
+        userId: userId,
+        user: user,
+        text: text,
+        timestamp: Timestamp.now(),
+      );
+      await _postsCollection
+          .doc(postId)
+          .collection('comments')
+          .add(comment.toMap());
+    } catch (e) {
+      throw Exception('Error al añadir el comentario: ${e.toString()}');
+    }
+  }
+
+
+  Stream<List<Comment>> getCommentsStream(String postId) {
     return _postsCollection
         .doc(postId)
         .collection('comments')
@@ -57,280 +116,98 @@ class PostRepository {
     });
   }
 
-  Stream<List<Post>> getAllPostsStream() {
-    return _postsCollection.orderBy('timestamp', descending: true).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => doc.data()).toList();
-    });
-  }
-
-  Stream<List<Post>> getPostsByUserStream(String userId) {
-    return _postsCollection
-        .where('user.uid', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
-  }
-
-  Stream<List<Comment>> getCommentsByUserStream(String userId) {
-    return _firestore
-        .collectionGroup('comments')
-        .where('userId', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Comment.fromMap(doc.data(), doc.id)).toList());
-  }
-
-  Stream<List<Post>> getFavoritePostsStream(List<String> postIds) {
-    if (postIds.isEmpty) {
-      return Stream.value([]);
-    }
-    return _postsCollection
-        .where(FieldPath.documentId, whereIn: postIds)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
-  }
-
-  Future<Post?> getPostFuture(String postId) async {
-    final doc = await _postsCollection.doc(postId).get();
-    return doc.data();
-  }
-
-  Future<void> addPost({
-    required String description,
-    required File imageFile,
-    required String location,
-    required double latitude,
-    required double longitude,
-    required String category,
-    required double price,
-    required double discountPrice,
-    required String store,
-    required User user,
-  }) async {
-    try {
-      final imageUrl = await _uploadImageToCloudinary(imageFile);
-      final newPost = Post(
-        id: '', 
-        description: description,
-        imageUrl: imageUrl,
-        location: location,
-        latitude: latitude,
-        longitude: longitude,
-        category: category,
-        price: price,
-        discountPrice: discountPrice,
-        store: store,
-        userId: user.id,
-        user: user,
-        timestamp: Timestamp.now(),
-        scores: [],
-        status: 'activa',
-      );
-      await _postsCollection.add(newPost);
-    } catch (e) {
-      throw Exception('Error al añadir la publicación: ${e.toString()}');
-    }
-  }
-
-    Future<void> addComment({
-    required String postId,
-    required String userId,
-    required String text,
-    required User user,
-  }) async {
-    final comment = Comment(
-      id: '', // Firestore will generate this
-      postId: postId,
-      userId: userId,
-      text: text,
-      user: user, // Pass the user object directly
-      timestamp: Timestamp.now(),
-    );
-    await _postsCollection.doc(postId).collection('comments').add(comment.toMap());
-  }
-
-  Future<String> _uploadImageToCloudinary(File imageFile) async {
-    try {
-      CloudinaryResponse response = await _cloudinary.uploadFile(
-        CloudinaryFile.fromFile(imageFile.path, resourceType: CloudinaryResourceType.Image),
-      );
-      return response.secureUrl;
-    } catch (e) {
-      throw Exception('Error al subir la imagen: ${e.toString()}');
-    }
-  }
-
-  Future<void> updatePostScore(
-      {required String postId, required String userId, required int value}) async {
-    final postRef = _postsCollection.doc(postId);
-
-    return _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(postRef);
-      if (!snapshot.exists) {
-        throw Exception("La publicación no fue encontrada.");
-      }
-
-      final post = snapshot.data()!;
-      if (post.status != "activa") {
-        throw Exception("La publicación no está activa, no se puede cambiar la puntuación.");
-      }
-
-      final newScores = List<Score>.from(post.scores);
-      final existingScoreIndex = newScores.indexWhere((s) => s.userId == userId);
-
-      if (existingScoreIndex != -1) {
-        if (newScores[existingScoreIndex].value == value) {
-          newScores.removeAt(existingScoreIndex);
-        } else {
-          newScores[existingScoreIndex] = newScores[existingScoreIndex].copyWith(value: value);
-        }
-      } else {
-        newScores.add(Score(userId: userId, value: value));
-      }
-
-      transaction.update(postRef, {'scores': newScores.map((s) => s.toMap()).toList()});
-
-      final totalScore = newScores.fold<int>(0, (total, item) => total + item.value);
-      if (totalScore < -15) {
-        transaction.update(postRef, {'status': 'vencida'});
-      }
-    });
-  }
-
-  Future<void> addCommentToPost({required String postId, required Comment comment}) async {
-    final commentWithTimestamp = comment.copyWith(timestamp: Timestamp.now());
-    await _postsCollection.doc(postId).collection('comments').add(commentWithTimestamp.toMap());
-  }
-
   Stream<List<Comment>> getCommentsForPost(String postId) {
-    return _postsCollection
-        .doc(postId)
-        .collection('comments')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Comment.fromMap(doc.data(), doc.id)).toList());
+     return getCommentsStream(postId);
   }
 
-  Future<(List<Post>, DocumentSnapshot?)> getPosts({
-    DocumentSnapshot? lastVisiblePost,
+   Future<void> addCommentToPost({required String postId, required Comment comment}) async {
+    try {
+       await _postsCollection
+          .doc(postId)
+          .collection('comments')
+          .add(comment.toMap());
+    } catch (e) {
+        throw Exception('Error al añadir el comentario: ${e.toString()}');
+    }
+  }
+  
+  Future<Post?> getPostFuture(String postId) async {
+    try {
+      final doc = await _postsCollection.doc(postId).get();
+      return doc.data();
+    } catch (e) {
+      developer.log('Error fetching post: $e', name: 'PostRepository');
+      return null;
+    }
+  }
+
+
+  Future<void> deletePost(String postId) async {
+    try {
+      final commentsQuery = await _postsCollection.doc(postId).collection('comments').get();
+      final WriteBatch batch = _firestore.batch();
+
+      for (var doc in commentsQuery.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      await _postsCollection.doc(postId).delete();
+    } catch (e) {
+      throw Exception('Error al eliminar el post: ${e.toString()}');
+    }
+  }
+
+    Future<Map<String, dynamic>> getPosts({
+    DocumentSnapshot? lastVisible,
     String? category,
   }) async {
-    const limit = 10;
-    Query<Post> query = _postsCollection;
+    var query = _postsCollection.orderBy('timestamp', descending: true);
 
     if (category != null && category != "Todos") {
       query = query.where('category', isEqualTo: category);
     }
 
-    query = query.orderBy('timestamp', descending: true).limit(limit);
-
-    if (lastVisiblePost != null) {
-      query = query.startAfterDocument(lastVisiblePost);
+    if (lastVisible != null) {
+      query = query.startAfterDocument(lastVisible);
     }
 
-    final snapshot = await query.get();
+    final snapshot = await query.limit(10).get();
     final posts = snapshot.docs.map((doc) => doc.data()).toList();
     final newLastVisible = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
 
-    return (posts, newLastVisible);
-  }
-
-  Future<Post?> getPostById(String postId) async {
-    final doc = await _postsCollection.doc(postId).get();
-    return doc.data();
-  }
-
-  Future<void> deletePost(String postId) async {
-    final postRef = _postsCollection.doc(postId);
-    final batch = _firestore.batch();
-
-    var commentsSnapshot = await postRef.collection('comments').get();
-    for (var doc in commentsSnapshot.docs) {
-      batch.delete(doc.reference);
-    }
-
-    batch.delete(postRef);
-
-    await batch.commit();
-  }
-
-  Future<void> expireOldPosts() async {
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    final cutoffDate = Timestamp.fromDate(thirtyDaysAgo);
-
-    final querySnapshot = await _postsCollection
-        .where('timestamp', isLessThan: cutoffDate)
-        .where('status', isEqualTo: 'activa')
-        .get();
-
-    final batch = _firestore.batch();
-    for (final document in querySnapshot.docs) {
-      batch.update(document.reference, {'status': 'vencida'});
-    }
-    await batch.commit();
-  }
-
-  Future<void> updatePostStatus(String postId, String newStatus) async {
-    await _postsCollection.doc(postId).update({'status': newStatus});
-  }
-
-  Future<void> updatePostDetails({
-    required String postId,
-    required String description,
-    required double price,
-    required double discountPrice,
-    required String category,
-    required String store,
-  }) async {
-    final updates = {
-      'description': description,
-      'price': price,
-      'discountPrice': discountPrice,
-      'category': category,
-      'store': store,
+    return {
+      'posts': posts,
+      'lastVisible': newLastVisible,
     };
-    await _postsCollection.doc(postId).update(updates);
   }
 
-  Future<List<Post>> getFilteredPosts({
-    String status = "Todos",
-    String category = "Todos",
-    String sortOption = "Fecha (más recientes)",
-  }) async {
-    Query<Post> query = _postsCollection;
-
-    if (status != "Todos") {
-      query = query.where('status', isEqualTo: status.toLowerCase());
+   Future<void> updatePostDetails(
+      {required String postId,
+      required String description,
+      required double price,
+      required double discountPrice,
+      required String category,
+      required String store}) async {
+    try {
+      final updates = {
+        "description": description,
+        "price": price,
+        "discountPrice": discountPrice,
+        "category": category,
+        "store": store
+      };
+      await _postsCollection.doc(postId).update(updates);
+    } catch (e) {
+      throw Exception("Error al actualizar los detalles del post: ${e.toString()}");
     }
-    if (category != "Todos") {
-      query = query.where('category', isEqualTo: category);
+  }
+
+  Future<void> updatePostStatus({required String postId, required String newStatus}) async {
+    try {
+      await _postsCollection.doc(postId).update({'status': newStatus});
+    } catch (e) {
+      throw Exception("Error al actualizar el estado del post: ${e.toString()}");
     }
-
-    switch (sortOption) {
-      case "Precio (menor a mayor)":
-        query = query.orderBy('price', descending: false);
-        break;
-      case "Precio (mayor a menor)":
-        query = query.orderBy('price', descending: true);
-        break;
-      case "Fecha (más recientes)":
-      default:
-        query = query.orderBy('timestamp', descending: true);
-    }
-
-    final snapshot = await query.get();
-    var posts = snapshot.docs.map((doc) => doc.data()).toList();
-
-    if (sortOption == "Puntaje") {
-      posts.sort((a, b) {
-        final scoreA = a.scores.fold<int>(0, (total, s) => total + s.value);
-        final scoreB = b.scores.fold<int>(0, (total, s) => total + s.value);
-        return scoreB.compareTo(scoreA);
-      });
-    }
-
-    return posts;
   }
 }

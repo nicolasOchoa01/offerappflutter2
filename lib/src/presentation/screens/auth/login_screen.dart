@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:myapp/src/services/auth_service.dart';
+// FIX: Import the correct AuthNotifier, not the obsolete AuthService
+import 'package:myapp/src/application/auth/auth_notifier.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false; // Add a loading state
 
   @override
   void dispose() {
@@ -23,23 +25,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signIn() async {
-    if (!_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate() || _isLoading) {
       return;
     }
-    
-    final authService = Provider.of<AuthService>(context, listen: false);
+
+    setState(() => _isLoading = true);
+
+    // FIX: Use the modern AuthNotifier from the provider context.
+    final authNotifier = context.read<AuthNotifier>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
-      await authService.signInWithEmailAndPassword(
+      // FIX: Call the login method on the notifier.
+      await authNotifier.login(
         _emailController.text,
         _passwordController.text,
       );
-      // La navegación es manejada por el redirect de go_router
+      // Navigation is handled automatically by the GoRouter redirect based on AuthNotifier's state.
     } catch (e) {
+      // The AuthNotifier now throws specific errors, which we can display.
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Error al iniciar sesión: ${e.toString()}')),
       );
+    } finally {
+       if (mounted) {
+        setState(() => _isLoading = false);
+       }
     }
   }
 
@@ -83,13 +94,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         value!.isEmpty ? 'Por favor ingrese su contraseña' : null,
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _signIn,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Ingresar'),
-                  ),
+                  // Show a loading indicator on the button when signing in
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
+                          onPressed: _signIn,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('Ingresar'),
+                        ),
                   const SizedBox(height: 24),
                   TextButton(
                     onPressed: () => context.go('/register'),

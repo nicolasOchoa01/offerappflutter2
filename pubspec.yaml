@@ -33,6 +33,9 @@ dependencies:
   share_plus: ^12.0.1
   firebase_storage: ^12.4.10
   url_launcher: ^6.3.2
+  shared_preferences: ^2.5.3
+  firebase_messaging: ^15.2.10
+  equatable: ^2.0.7
 
 dev_dependencies:
   flutter_test:

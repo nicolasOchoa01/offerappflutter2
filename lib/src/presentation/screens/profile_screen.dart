@@ -1,16 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:myapp/src/data/repositories/auth_repository.dart';
-import 'package:myapp/src/data/repositories/post_repository.dart';
-import 'package:myapp/src/data/repositories/user_repository.dart';
+import 'package:myapp/src/application/main/main_notifier.dart';
+import 'package:myapp/src/data/services/image_picker_service.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
 import 'package:myapp/src/domain/entities/post.dart';
 import 'package:myapp/src/domain/entities/user.dart';
-import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:myapp/src/presentation/widgets/post_card.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userId;
@@ -23,37 +22,32 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  User? _currentUser;
-  bool _isMyProfile = false;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    _setup();
+    // Initial setup for the TabController.
+    _setupTabController();
+    // Load user data after the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MainNotifier>().loadUserProfile(widget.userId);
+    });
   }
 
   @override
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.userId != oldWidget.userId) {
-      _setup();
+      // If the user ID changes, re-setup the tab controller and load new data.
+      _setupTabController();
+      context.read<MainNotifier>().loadUserProfile(widget.userId);
     }
   }
 
-  void _setup() {
-    final authRepo = context.read<AuthRepository>();
-    _isMyProfile = authRepo.currentUser?.uid == widget.userId;
-    _tabController = TabController(length: _isMyProfile ? 3 : 2, vsync: this);
-
-    // Listen to user changes to get the domain User object
-    authRepo.userChanges.listen((user) {
-      if (mounted) {
-        setState(() {
-          _currentUser = user;
-        });
-      }
-    });
+  void _setupTabController() {
+    final isMyProfile = context.read<MainNotifier>().user.id == widget.userId;
+    // The number of tabs depends on whether it's the current user's profile.
+    _tabController = TabController(length: isMyProfile ? 3 : 2, vsync: this);
   }
 
   @override
@@ -63,98 +57,108 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _changeProfileImage() async {
-    final userRepo = context.read<UserRepository>();
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final imagePicker = context.read<ImagePickerService>();
+    final notifier = context.read<MainNotifier>();
+    
+    final File? imageFile = await imagePicker.pickImageFromGallery();
 
-    if (image != null && _isMyProfile && mounted) {
-      await userRepo.updateProfilePicture(widget.userId, image.path);
+    if (imageFile != null) {
+      // Let the notifier handle the business logic of updating the image.
+      await notifier.updateProfileImage(imageFile);
     }
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
-    final userRepo = context.watch<UserRepository>();
-    final authRepo = context.watch<AuthRepository>();
+    // Watch the MainNotifier for state changes.
+    final notifier = context.watch<MainNotifier>();
+    final profileUser = notifier.profileUser;
+    final currentUser = notifier.user;
+    final isMyProfile = currentUser.id == widget.userId;
+
+    if (profileUser == null) {
+      // Show a loading indicator while the profile data is being fetched.
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
-      appBar: CustomHeader(
-        username: _currentUser?.username ?? "",
-        title: _isMyProfile ? "Mi Perfil" : null,
-        onBackClicked: GoRouter.of(context).canPop() ? () => GoRouter.of(context).pop() : null,
-        onProfileClick: () => context.go('/profile'),
-        onSessionClicked: () => authRepo.signOut(),
+      appBar: AppBar(
+        title: Text(isMyProfile ? 'Mi Perfil' : profileUser.username),
+        leading: GoRouter.of(context).canPop() ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => GoRouter.of(context).pop()) : null,
       ),
-      body: StreamBuilder<User?>(
-        stream: userRepo.getUserStream(widget.userId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-            return const Center(child: Text('Usuario no encontrado.'));
-          }
-
-          final profileUser = snapshot.data!;
-
-          return NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverToBoxAdapter(
-                  child: _buildProfileHeader(context, profileUser),
-                ),
-                SliverPersistentHeader(
-                  delegate: _SliverAppBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      tabs: _isMyProfile
-                          ? const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment)), Tab(icon: Icon(Icons.favorite))]
-                          : const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.comment))],
-                    ),
-                  ),
-                  pinned: true,
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: _buildTabs(context, profileUser),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: _buildProfileHeader(context, notifier, profileUser, isMyProfile),
             ),
-          );
+            SliverPersistentHeader(
+              delegate: _SliverAppBarDelegate(
+                TabBar(
+                  controller: _tabController,
+                  tabs: _buildTabs(isMyProfile),
+                ),
+              ),
+              pinned: true,
+            ),
+          ];
         },
+        body: TabBarView(
+          controller: _tabController,
+          children: _buildTabViews(notifier, isMyProfile),
+        ),
       ),
     );
   }
 
-  List<Widget> _buildTabs(BuildContext context, User profileUser) {
-    final postRepo = context.read<PostRepository>();
-    final tabs = <Widget>[
-      _buildPostsTab(postRepo, profileUser.id),
-      _buildCommentsTab(context, postRepo, profileUser.id),
+  List<Tab> _buildTabs(bool isMyProfile) {
+    final tabs = [
+      const Tab(icon: Icon(Icons.grid_on)),
+      const Tab(icon: Icon(Icons.comment)),
     ];
-
-    if (_isMyProfile) {
-      tabs.add(_buildFavoritesTab(postRepo, profileUser));
+    if (isMyProfile) {
+      tabs.add(const Tab(icon: Icon(Icons.favorite)));
     }
-
     return tabs;
   }
 
-  Widget _buildProfileHeader(BuildContext context, User profileUser) {
+  List<Widget> _buildTabViews(MainNotifier notifier, bool isMyProfile) {
+    final currentUser = notifier.user;
+    
+    final views = [
+      // Posts Tab
+      _PostListView(posts: notifier.profileUserPosts, currentUser: currentUser, notifier: notifier),
+      // Comments Tab
+      _CommentListView(comments: notifier.profileUserComments),
+    ];
+    if (isMyProfile) {
+      // Favorites Tab, only for the current user's profile
+      views.add(_PostListView(posts: notifier.favoritePosts, currentUser: currentUser, notifier: notifier));
+    }
+    return views;
+  }
+
+  Widget _buildProfileHeader(BuildContext context, MainNotifier notifier, User profileUser, bool isMyProfile) {
+    final postCount = notifier.profileUserPosts.length;
+    final isFollowing = notifier.user.following.contains(profileUser.id);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           GestureDetector(
-            onTap: _isMyProfile ? _changeProfileImage : null,
+            onTap: isMyProfile ? _changeProfileImage : null,
             child: Stack(
               alignment: Alignment.bottomRight,
               children: [
                 CircleAvatar(
                   radius: 50,
-                  backgroundImage: profileUser.profileImageUrl != null ? NetworkImage(profileUser.profileImageUrl!) : null,
+                  backgroundImage: profileUser.profileImageUrl != null
+                      ? CachedNetworkImageProvider(profileUser.profileImageUrl!)
+                      : null,
                   child: profileUser.profileImageUrl == null ? const Icon(Icons.person, size: 50) : null,
                 ),
-                if (_isMyProfile)
+                if (isMyProfile)
                   const CircleAvatar(
                     radius: 15,
                     backgroundColor: Colors.black54,
@@ -166,98 +170,87 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           const SizedBox(height: 12),
           Text(profileUser.username, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
-          StreamBuilder<List<Post>>(
-            stream: context.read<PostRepository>().getPostsByUserStream(profileUser.id),
-            builder: (context, postSnapshot) {
-              final postCount = postSnapshot.data?.length ?? 0;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _StatColumn(count: postCount, title: "Posts"),
-                  _StatColumn(count: profileUser.followers.length, title: "Seguidores"),
-                  _StatColumn(count: profileUser.following.length, title: "Seguidos"),
-                ],
-              );
-            },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _StatColumn(count: postCount, title: "Posts"),
+              _StatColumn(count: profileUser.followers.length, title: "Seguidores"),
+              _StatColumn(count: profileUser.following.length, title: "Seguidos"),
+            ],
           ),
           const SizedBox(height: 16),
-          if (!_isMyProfile && _currentUser != null)
-             StreamBuilder<User?>(
-              stream: context.read<UserRepository>().getUserStream(_currentUser!.id),
-               builder: (context, snapshot) {
-                 if (!snapshot.hasData) return const SizedBox.shrink();
-                final isFollowing = snapshot.data!.following.contains(profileUser.id);
-
-                return ElevatedButton(
-                  onPressed: () {
-                    final userRepo = context.read<UserRepository>();
-                    if (isFollowing) {
-                      userRepo.unfollowUser(_currentUser!.id, profileUser.id);
-                    } else {
-                      userRepo.followUser(_currentUser!.id, profileUser.id);
-                    }
-                  },
-                  child: Text(isFollowing ? 'Dejar de Seguir' : 'Seguir'),
-                );
+          if (!isMyProfile)
+            ElevatedButton(
+              onPressed: () {
+                if (isFollowing) {
+                  notifier.unfollowUser(profileUser.id);
+                } else {
+                  notifier.followUser(profileUser.id);
+                }
               },
+              child: Text(isFollowing ? 'Dejar de Seguir' : 'Seguir'),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 40)),
             ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildPostsTab(PostRepository postRepo, String userId) {
-    return StreamBuilder<List<Post>>(
-      stream: postRepo.getPostsByUserStream(userId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final posts = snapshot.data!;
-        if (posts.isEmpty) return const Center(child: Text('No hay posts todavía.'));
+class _PostListView extends StatelessWidget {
+  final List<Post> posts;
+  final User currentUser;
+  final MainNotifier notifier;
 
-        return ListView.builder(
-          itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(
-            post: posts[index],
-            onClick: () => context.push('/post/${posts[index].id}', extra: posts[index]),
-          ),
+  const _PostListView({required this.posts, required this.currentUser, required this.notifier});
+
+  @override
+  Widget build(BuildContext context) {
+    if (posts.isEmpty) {
+      return const Center(child: Text('No hay posts para mostrar.'));
+    }
+    return ListView.builder(
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        final isFavorite = currentUser.favorites.contains(post.id);
+        return PostCard(
+          post: post,
+          isFavorite: isFavorite,
+          onToggleFavorite: () => notifier.toggleFavorite(post.id),
+          onClick: () => context.push('/post/${post.id}', extra: post),
         );
       },
     );
   }
+}
 
-  Widget _buildCommentsTab(BuildContext context, PostRepository postRepo, String userId) {
-    return StreamBuilder<List<Comment>>(
-      stream: postRepo.getCommentsByUserStream(userId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final comments = snapshot.data!;
-        if (comments.isEmpty) return const Center(child: Text('No hay comentarios todavía.'));
+class _CommentListView extends StatelessWidget {
+  final List<Comment> comments;
 
-        return ListView.builder(
-          itemCount: comments.length,
-          itemBuilder: (context, index) => ProfileCommentItem(
-            comment: comments[index],
-            postRepo: postRepo,
-            onTap: (post) => context.push('/post/${post.id}', extra: post),
-          ),
-        );
-      },
-    );
-  }
+  const _CommentListView({required this.comments});
 
-  Widget _buildFavoritesTab(PostRepository postRepo, User user) {
-    return StreamBuilder<List<Post>>(
-      stream: postRepo.getFavoritePostsStream(user.favorites),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final posts = snapshot.data!;
-        if (posts.isEmpty) return const Center(child: Text('No tienes posts favoritos.'));
-
-        return ListView.builder(
-          itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(
-            post: posts[index],
-            onClick: () => context.push('/post/${posts[index].id}', extra: posts[index]),
+  @override
+  Widget build(BuildContext context) {
+    if (comments.isEmpty) {
+      return const Center(child: Text('No hay comentarios todavía.'));
+    }
+    return ListView.builder(
+      itemCount: comments.length,
+      itemBuilder: (context, index) {
+        final comment = comments[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ListTile(
+             leading: CircleAvatar(
+                backgroundImage: comment.user?.profileImageUrl != null
+                    ? CachedNetworkImageProvider(comment.user!.profileImageUrl!)
+                    : null,
+                child: comment.user?.profileImageUrl == null ? const Icon(Icons.person) : null,
+              ),
+            title: Text(comment.user?.username ?? 'Anónimo'),
+            subtitle: Text(comment.text),
+            trailing: Text(DateFormat('dd MMM').format(comment.timestamp!.toDate())),
           ),
         );
       },
@@ -284,9 +277,9 @@ class _StatColumn extends StatelessWidget {
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
-
   final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
 
   @override
   double get minExtent => _tabBar.preferredSize.height;
@@ -296,7 +289,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: Theme.of(context).scaffoldBackgroundColor, // Match background
       child: _tabBar,
     );
   }
@@ -304,86 +297,5 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
     return false;
-  }
-}
-
-class ProfileCommentItem extends StatelessWidget {
-  final Comment comment;
-  final PostRepository postRepo;
-  final Function(Post) onTap;
-
-  const ProfileCommentItem({super.key, required this.comment, required this.postRepo, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Post?>(
-      future: postRepo.getPostFuture(comment.postId),
-      builder: (context, postSnapshot) {
-        final post = postSnapshot.data;
-        final sdf = DateFormat('dd MMM yyyy', 'es_ES');
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: InkWell(
-            onTap: post != null ? () => onTap(post) : null,
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (post != null)
-                    Row(
-                      children: [
-                        Image.network(post.imageUrl, width: 40, height: 40, fit: BoxFit.cover),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "En respuesta a: ${post.description}",
-                            style: Theme.of(context).textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (post != null) const Divider(),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: comment.user?.profileImageUrl != null
-                            ? NetworkImage(comment.user!.profileImageUrl!)
-                            : null,
-                        child: comment.user?.profileImageUrl == null ? const Icon(Icons.person) : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(comment.user?.username ?? 'Anónimo', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 4),
-                            Text(comment.text, style: Theme.of(context).textTheme.bodyMedium),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
-                  if (comment.timestamp != null)
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Text(
-                        sdf.format(comment.timestamp!.toDate()),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    )
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 }
