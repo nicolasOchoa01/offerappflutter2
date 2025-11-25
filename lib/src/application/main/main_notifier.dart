@@ -99,7 +99,7 @@ class MainNotifier with ChangeNotifier {
         notifyListeners();
       }
     });
-    _myCommentsSubscription = _postRepository.getCommentsStream(_user.id).listen((comments) {
+    _myCommentsSubscription = _postRepository.getCommentsForUserStream(_user.id).listen((comments) {
       _myComments = comments;
       notifyListeners();
     });
@@ -192,29 +192,30 @@ class MainNotifier with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Fetch the user profile
       final profileToLoad = userId == _user.id ? _user : await _authRepository.getUser(userId);
+      if (profileToLoad == null) return;
+
       _profileUser = profileToLoad;
+      notifyListeners();
 
-      if (profileToLoad != null) {
-        // Fetch posts for the profile user
-        _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
+      _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
+      notifyListeners();
 
-        // Fetch favorite posts for the profile user
+      if (profileToLoad.favorites.isNotEmpty) {
         _profileUserFavorites = await _postRepository.getFavoritePosts(profileToLoad.favorites);
-
-        // Start listening to comments
-        _profileCommentsSubscription = _postRepository.getCommentsStream(profileToLoad.id).listen((comments) {
-            _profileUserComments = comments;
-            notifyListeners();
-        });
+        notifyListeners();
       }
+
+      _profileCommentsSubscription = _postRepository.getCommentsForUserStream(profileToLoad.id).listen((comments) {
+          _profileUserComments = comments;
+          notifyListeners();
+      });
+
     } catch(e) {
         if (kDebugMode) {
           print("Error loading user profile: $e");
         }
     }
-    notifyListeners();
   }
 
 
@@ -275,15 +276,17 @@ class MainNotifier with ChangeNotifier {
       }
     }
 
-    Future<void> addComment(String postId, String text) async {
-        try {
-            await _postRepository.addComment(postId: postId, text: text, userId: _user.id);
-        } catch (e) {
-            if (kDebugMode) {
-                print("Error adding comment: $e");
-            }
-        }
+  Future<void> addComment(String postId, String text) async {
+    try {
+      await _postRepository.addComment(postId: postId, text: text, userId: _user.id);
+      // The stream in loadUserProfile will handle the update automatically.
+      // No need to call notifyListeners() here if streams are set up correctly.
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error adding comment: $e");
+      }
     }
+  }
 
   Future<void> addPost({
     required String description,
@@ -371,27 +374,37 @@ class MainNotifier with ChangeNotifier {
   }
 
   void toggleFavorite(String postId) {
-      final isCurrentlyFavorite = _user.favorites.contains(postId);
-      final originalFavorites = List<String>.from(_user.favorites);
+    final isCurrentlyFavorite = _user.favorites.contains(postId);
+    final originalFavorites = List<String>.from(_user.favorites);
 
+    // Optimistically update the UI
+    if (isCurrentlyFavorite) {
+      _user.favorites.remove(postId);
+    } else {
+      _user.favorites.add(postId);
+    }
+    notifyListeners();
+
+    // Update the backend and handle errors
+    try {
       if (isCurrentlyFavorite) {
-        _user.favorites.remove(postId);
+        _authRepository.removeFavorite(userId: _user.id, postId: postId);
       } else {
-        _user.favorites.add(postId);
+        _authRepository.addFavorite(userId: _user.id, postId: postId);
       }
+    } catch (e) {
+      // Revert UI on error
+      _user = _user.copyWith(favorites: originalFavorites);
       notifyListeners();
+    }
 
-      if (isCurrentlyFavorite) {
-        _authRepository.removeFavorite(userId: _user.id, postId: postId).catchError((_){
-            _user = _user.copyWith(favorites: originalFavorites);
-            notifyListeners();
-        });
-      } else {
-        _authRepository.addFavorite(userId: _user.id, postId: postId).catchError((_){
-            _user = _user.copyWith(favorites: originalFavorites);
-            notifyListeners();
-        });
-      }
+    // If the current user is viewing their own profile, refresh the favorite posts list
+    if (_profileUser?.id == _user.id) {
+      _postRepository.getFavoritePosts(_user.favorites).then((posts) {
+        _profileUserFavorites = posts;
+        notifyListeners();
+      });
+    }
   }
 
   Future<void> voteOnPost(String postId, int value) async {
