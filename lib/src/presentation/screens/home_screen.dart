@@ -5,6 +5,8 @@ import 'package:myapp/src/application/main/main_notifier.dart';
 import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:myapp/src/presentation/widgets/post_card.dart';
 import 'package:provider/provider.dart';
+import 'package:myapp/src/presentation/widgets/side_menu.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -65,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onSessionClicked: () => authNotifier.logout(), // Use the correct notifier and method
         ),
       ),
+      drawer: const SideMenu(), // ← Sidebar integrado
       body: RefreshIndicator(
         onRefresh: () => Future.sync(mainNotifier.refreshPosts), // Use the notifier's refresh method
         child: ListView.builder(
