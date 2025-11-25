@@ -83,6 +83,14 @@ class MainNotifier with ChangeNotifier {
     return _allPosts.where((p) => _profileUser!.favorites.contains(p.id)).toList();
   }
 
+  Post? getPostById(String postId) {
+    try {
+      return _allPosts.firstWhere((p) => p.id == postId);
+    } catch (e) {
+      return null;
+    }
+  }
+
   MainNotifier(this._user, this._postRepository, this._authRepository) {
     refreshPosts();
     _authRepository.getUser(_user.id).then((fetchedUser) {
@@ -95,6 +103,10 @@ class MainNotifier with ChangeNotifier {
       _myComments = comments;
       notifyListeners();
     });
+  }
+
+  Future<void> signOut() async {
+    await _authRepository.logout();
   }
 
   void onThemeChange(bool? isDark) {
