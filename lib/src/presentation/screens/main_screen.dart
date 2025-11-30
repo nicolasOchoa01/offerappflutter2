@@ -13,15 +13,15 @@ class MainScreen extends StatelessWidget {
     final authRepo = context.read<AuthRepository>();
 
     return Scaffold(
-      // The appBar is now handled by individual screens within the shell
+
       body: navigationShell,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: navigationShell.currentIndex,
         onTap: (index) {
-          if (index == 1) { // The "Create Post" button
+          if (index == 1) {
             context.push('/create_post');
           } else {
-            // The other tabs (Home, Profile)
+
             navigationShell.goBranch(
               index > 1 ? index -1 : index,
               initialLocation: index == navigationShell.currentIndex,

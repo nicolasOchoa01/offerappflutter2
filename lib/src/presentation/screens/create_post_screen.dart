@@ -8,6 +8,7 @@ import 'package:myapp/src/application/auth/auth_notifier.dart';
 import 'package:myapp/src/application/main/main_notifier.dart';
 import 'package:myapp/src/presentation/widgets/custom_header.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 
 class CreatePostScreen extends StatefulWidget {
   // No longer needs the user passed in, as it will be fetched from the notifier.
@@ -84,22 +85,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-   void _calculatePrices() {
-    if (_selectedPromotionType == "Liquidación" || _selectedPromotionType == "Otros" || _selectedPromotionType == null) return;
+  void _calculatePrices() {
+    //calcula la promocion para algunos casos
+    if (_selectedPromotionType == "Liquidación" || _selectedPromotionType == "Otros" || _selectedPromotionType == null) {
+      if (mounted) setState(() {});
+      return;
+    }
 
-    if (mounted) {
-       setState(() {
-        if (_lastEditedField == "original") {
-          final originalPrice = double.tryParse(_originalPriceController.text);
-          if (originalPrice != null) {
-            _finalPriceController.text = _getFinalPrice(originalPrice, _selectedPromotionType!)?.toStringAsFixed(2) ?? '';
-          }
-        } else if (_lastEditedField == "final") {
-          final finalPrice = double.tryParse(_finalPriceController.text);
-          if (finalPrice != null) {
-            _originalPriceController.text = _getOriginalPrice(finalPrice, _selectedPromotionType!)?.toStringAsFixed(2) ?? '';
-          }
-        }
+    final originalPrice = double.tryParse(_originalPriceController.text);
+
+    if (mounted && originalPrice != null) {
+      setState(() {
+
+        _finalPriceController.text = _getFinalPrice(originalPrice, _selectedPromotionType!)?.toStringAsFixed(2) ?? '';
       });
     }
   }
@@ -112,18 +110,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       case "25% OFF": return originalPrice * 0.75;
       case "30% OFF": return originalPrice * 0.70;
       case "50% OFF": return originalPrice * 0.50;
-      default: return null;
-    }
-  }
-
-  double? _getOriginalPrice(double finalPrice, String promotion) {
-     switch (promotion) {
-      case "2x1": return finalPrice * 2;
-      case "3x1": return finalPrice * 3;
-      case "3x2": return finalPrice * 3 / 2;
-      case "25% OFF": return finalPrice / 0.75;
-      case "30% OFF": return finalPrice / 0.70;
-      case "50% OFF": return finalPrice / 0.50;
       default: return null;
     }
   }
@@ -174,7 +160,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (!(_formKey.currentState?.validate() ?? false) || _image == null) {
       return;
     }
-
+    //se asegura que el precio final sea menor que el original
+    final originalPrice = double.tryParse(_originalPriceController.text) ?? 0.0;
+    final finalPrice = double.tryParse(_finalPriceController.text) ?? 0.0;
+    if (finalPrice >= originalPrice) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El precio final debe ser menor al precio original.')));
+      return;
+    }
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -194,8 +186,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         latitude: _latitude,
         longitude: _longitude,
         category: _selectedCategory!,
-        price: double.parse(_originalPriceController.text),
-        discountPrice: double.parse(_finalPriceController.text),
+        price: originalPrice,
+        discountPrice: finalPrice,
         store: _storeController.text.isNotEmpty ? _storeController.text : 'desconocido',
       );
       
@@ -241,6 +233,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       floatingLabelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
     );
 
+    final isFixedDiscount = _selectedPromotionType != "Liquidación" && _selectedPromotionType != "Otros" && _selectedPromotionType != null;
+
     return Scaffold(
       appBar: CustomHeader(
         username: mainNotifier.user.username,
@@ -285,9 +279,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         setState(() {
                           _selectedPromotionType = value;
                           _updateDescription();
-                          if(value != "Liquidación" && value != "Otros") {
-                              _lastEditedField = "original"; // Recalculate based on original price by default
-                              _calculatePrices();
+                          if (!isFixedDiscount) {
+                            _finalPriceController.clear();
                           }
                         });
                       },
@@ -324,8 +317,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     TextFormField(
                       controller: _originalPriceController,
                       decoration: inputDecoration.copyWith(labelText: 'Precio Original'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        // permite ingresar 9 numeros y 2 digitos a lo sumo
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Debe ingresar el precio original.';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Ingrese un número válido (ej: 100.00)';
+                        }
+                        return null;
+                      },
+                      onChanged: (_) => _calculatePrices(),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
