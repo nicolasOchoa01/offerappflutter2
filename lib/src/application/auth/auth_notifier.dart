@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:myapp/src/application/auth/auth_state.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
 import 'package:myapp/src/data/services/session_manager.dart';
-import 'package:myapp/src/domain/entities/user.dart';
 
 class AuthNotifier with ChangeNotifier {
   final AuthRepository _repository;
