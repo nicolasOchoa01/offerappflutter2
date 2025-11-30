@@ -15,23 +15,23 @@ import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('es_ES', null);
-  
+
   // Create instances of repositories and services
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
   final sessionManager = SessionManager();
   final firebaseMessaging = FirebaseMessaging.instance;
 
-  runApp(MyApp(
-    authRepository: authRepository,
-    postRepository: postRepository,
-    sessionManager: sessionManager,
-    firebaseMessaging: firebaseMessaging,
-  ));
+  runApp(
+    MyApp(
+      authRepository: authRepository,
+      postRepository: postRepository,
+      sessionManager: sessionManager,
+      firebaseMessaging: firebaseMessaging,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -58,19 +58,16 @@ class MyApp extends StatelessWidget {
         Provider.value(value: postRepository),
         Provider.value(value: sessionManager),
         Provider.value(value: firebaseMessaging),
-        
+
         // 2. Notifiers that depend on the services above.
         ChangeNotifierProvider(
           create: (context) => ThemeNotifier(sessionManager),
         ),
         ChangeNotifierProvider(
-          create: (context) => AuthNotifier(
-            authRepository,
-            sessionManager,
-            firebaseMessaging,
-          ),
+          create: (context) =>
+              AuthNotifier(authRepository, sessionManager, firebaseMessaging),
         ),
-        
+
         // 3. MainNotifier depends on the user from AuthNotifier. It's only available when logged in.
         // ChangeNotifierProxyProvider is the perfect tool for this.
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
@@ -79,7 +76,8 @@ class MyApp extends StatelessWidget {
             final authState = authNotifier.state;
             if (authState is AuthSuccess) {
               // When authenticated, create/update MainNotifier.
-              if (previousMainNotifier == null || previousMainNotifier.user.id != authState.user.id) {
+              if (previousMainNotifier == null ||
+                  previousMainNotifier.user.id != authState.user.id) {
                 return MainNotifier(
                   authState.user,
                   context.read<PostRepository>(),
@@ -104,12 +102,18 @@ class MyApp extends StatelessWidget {
             themeMode: context.watch<ThemeNotifier>().themeMode,
             theme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.blue,
+                brightness: Brightness.light,
+              ),
               visualDensity: VisualDensity.adaptivePlatformDensity,
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.blue,
+                brightness: Brightness.dark,
+              ),
             ),
             routerConfig: appRouter.router,
           );
