@@ -85,7 +85,7 @@ class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
           Expanded(child: titleWidget),
         ],
       ),
-      backgroundColor: colorScheme.primary,
+      backgroundColor: Colors.red,
       elevation: 4,
       actions: [
         PopupMenuButton<String>(

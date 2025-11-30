@@ -20,7 +20,7 @@ void main() async {
   );
   await initializeDateFormatting('es_ES', null);
   
-  // Create instances of repositories and services
+
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
   final sessionManager = SessionManager();
@@ -52,14 +52,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // 1. Provide instances of the repositories and services.
-        // This is more robust than creating them inside the provider itself.
+
         Provider.value(value: authRepository),
         Provider.value(value: postRepository),
         Provider.value(value: sessionManager),
         Provider.value(value: firebaseMessaging),
         
-        // 2. Notifiers that depend on the services above.
+
         ChangeNotifierProvider(
           create: (context) => ThemeNotifier(sessionManager),
         ),
@@ -71,8 +70,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
         
-        // 3. MainNotifier depends on the user from AuthNotifier. It's only available when logged in.
-        // ChangeNotifierProxyProvider is the perfect tool for this.
+
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
           create: (_) => null, // Initially null, created on auth success.
           update: (context, authNotifier, previousMainNotifier) {
@@ -86,21 +84,21 @@ class MyApp extends StatelessWidget {
                   context.read<AuthRepository>(),
                 );
               }
-              return previousMainNotifier; // Return existing if user is the same
+              return previousMainNotifier;
             }
-            return null; // Return null if not authenticated
+            return null;
           },
         ),
       ],
       child: Builder(
         builder: (context) {
-          // Use a Builder to get a context that is a descendant of the providers.
+
           final authNotifier = context.watch<AuthNotifier>();
           final appRouter = AppRouter(authNotifier: authNotifier);
 
           return MaterialApp.router(
             title: 'OfferApp',
-            // Watch ThemeNotifier to rebuild on theme changes
+
             themeMode: context.watch<ThemeNotifier>().themeMode,
             theme: ThemeData(
               useMaterial3: true,
