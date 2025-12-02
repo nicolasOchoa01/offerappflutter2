@@ -14,6 +14,49 @@ import 'package:myapp/src/navigation/app_router.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/src/services/firebase_messaging_service.dart';
 
+// Color Schemes defined from the native app's theme
+const lightColorScheme = ColorScheme(
+  brightness: Brightness.light,
+  primary: Color(0xFFB71C1C),
+  onPrimary: Colors.white,
+  secondary: Color(0xFF8D6E63),
+  onSecondary: Colors.white,
+  tertiary: Color(0xFFE64A19),
+  onTertiary: Colors.white,
+  error: Color(0xFFBA1A1A),
+  onError: Colors.white,
+  surface: Color(0xFFFCFCFC), 
+  onSurface: Color(0xFF1C1B1B),
+  background: Color(0xFFFCFCFC),
+  onBackground: Color(0xFF1C1B1B),
+);
+
+const darkColorScheme = ColorScheme(
+  brightness: Brightness.dark,
+  primary: Color(0xFFE57373),
+  onPrimary: Colors.black,
+  secondary: Color(0xFFBCAAA4),
+  onSecondary: Colors.black,
+  tertiary: Color(0xFFFFB59D),
+  onTertiary: Colors.black,
+  error: Color(0xFFFFB4AB),
+  onError: Color(0xFF690005),
+  surface: Color(0xFF1F1F1F),
+  onSurface: Colors.white,
+  background: Color(0xFF121212),
+  onBackground: Colors.white,
+);
+
+// Typography defined from the native app's theme
+const textTheme = TextTheme(
+  bodyLarge: TextStyle(
+    fontWeight: FontWeight.w400,
+    fontSize: 16.0,
+    height: 1.5, // 24.0sp line height / 16.0sp font size
+    letterSpacing: 0.5,
+  ),
+);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -101,18 +144,14 @@ class MyApp extends StatelessWidget {
             themeMode: context.watch<ThemeNotifier>().themeMode,
             theme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue,
-                brightness: Brightness.light,
-              ),
+              colorScheme: lightColorScheme,
+              textTheme: textTheme,
               visualDensity: VisualDensity.adaptivePlatformDensity,
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color.fromARGB(255, 52, 161, 224),
-                brightness: Brightness.dark,
-              ),
+              colorScheme: darkColorScheme,
+              textTheme: textTheme,
             ),
             routerConfig: appRouter.router,
           );

@@ -24,7 +24,7 @@ class MainNotifier with ChangeNotifier {
   String _searchQuery = "";
   String get searchQuery => _searchQuery;
 
-  final String _selectedCategory = "Todos";
+  String _selectedCategory = "Todos";
   String get selectedCategory => _selectedCategory;
 
   int _selectedFeedTab = 0;
@@ -121,6 +121,12 @@ class MainNotifier with ChangeNotifier {
     _searchQuery = newQuery;
     _applyFilters();
   }
+
+  void filterByCategory(String category) {
+    _selectedCategory = category;
+    refreshPosts();
+  }
+
     // Métodos para cambiar el orden
     void setSortOption(String field, bool descending) {
         _orderByField = field;

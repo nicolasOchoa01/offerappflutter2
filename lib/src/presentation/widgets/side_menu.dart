@@ -1,45 +1,82 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/src/application/main/main_notifier.dart';
+import 'package:myapp/src/application/theme/theme_notifier.dart';
+import 'package:provider/provider.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
+
   @override
   Widget build(BuildContext context) {
+    final mainNotifier = context.watch<MainNotifier?>();
+    final themeNotifier = context.watch<ThemeNotifier>();
+    final categories = [
+      "Todos", "Alimentos", "Tecnología", "Moda", "Deportes", "Construcción",
+      "Animales", "Electrodomésticos", "Servicios", "Educación",
+      "Juguetes", "Vehículos", "Otros"
+    ];
+
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Colors.blue),
-            child: Text(
-              'Categorías',
-              style: TextStyle(color: Colors.white, fontSize: 24),
+          Container(
+            width: double.infinity,
+            color: Theme.of(context).colorScheme.primary,
+            padding: const EdgeInsets.symmetric(vertical: 32.0),
+            child: Center(
+              child: Text(
+                "Filtros",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
-          _buildMenuItem(Icons.card_giftcard, 'Festividades'),
-          _buildMenuItem(Icons.store, 'Almacén'),
-          _buildMenuItem(
-            Icons.restaurant,
-            'Carnicería, Pescadería y Verdulería',
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
+                  child: Text(
+                    'Categorías',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ...categories.map((category) {
+                  final isSelected = mainNotifier?.selectedCategory == category;
+                  return ListTile(
+                    title: Text(
+                      category,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    tileColor: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.12) : null,
+                    onTap: () {
+                      mainNotifier?.filterByCategory(category);
+                      Navigator.of(context).pop();
+                    },
+                  );
+                }).toList(),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: Text(
+                    'Modo Oscuro',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  value: themeNotifier.isDarkMode ?? false,
+                  onChanged: (bool value) {
+                    themeNotifier.setTheme(value);
+                  },
+                ),
+              ],
+            ),
           ),
-          _buildMenuItem(Icons.ac_unit, 'Frescos y Congelados'),
-          _buildMenuItem(Icons.local_drink, 'Bebidas'),
-          _buildMenuItem(Icons.spa, 'Perfumería'),
-          _buildMenuItem(Icons.face, 'Belleza'),
-          _buildMenuItem(Icons.cleaning_services, 'Limpieza'),
-          _buildMenuItem(Icons.child_care, 'Bebés y Niños'),
-          _buildMenuItem(Icons.pets, 'Mascotas'),
         ],
       ),
-    );
-  }
-
-  Widget _buildMenuItem(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      onTap: () {
-        // Navegación o lógica según categoría
-      },
     );
   }
 }

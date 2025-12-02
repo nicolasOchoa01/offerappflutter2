@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -83,7 +82,7 @@ class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
           Expanded(child: titleWidget),
         ],
       ),
-      backgroundColor: Colors.red,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       elevation: 4,
       actions: [
         PopupMenuButton<String>(
