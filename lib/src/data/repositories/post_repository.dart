@@ -44,21 +44,77 @@ class PostRepository {
         .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildPostFromDoc)));
   }
 
-  Future<Map<String, dynamic>> getPosts({
-      DocumentSnapshot? lastVisible, 
-      int limit = 10, 
-      String? category, 
-      // 🔧 NUEVO: Parámetros para ordenar
-      String orderByField = 'timestamp', // Campo por defecto
-      bool descending = true, // Dirección por defecto
-    }) async {
-    var query = _firestore.collection('posts').orderBy('timestamp', descending: true).limit(limit);
+// ... código anterior
+// post_repository.dart
+// ...
+// post_repository.dart
 
-    if (lastVisible != null) {
-      query = query.startAfterDocument(lastVisible);
-    }
+// ... (código anterior)
+
+  Future<Map<String, dynamic>> getPosts({
+    DocumentSnapshot? lastVisible, 
+    int limit = 10, 
+      String? category,
+      String orderByField = 'timestamp', 
+      bool descending = true,
+      // 🆕 NUEVOS PARÁMETROS DE FILTRO
+      double? minPrice,
+      double? maxPrice,
+      String? promoType, // e.g., '2x1', '50% OFF', 'Liquidación'
+      String? status, // e.g., 'ACTIVA' o 'LIQUIDACION' (o como lo manejes)
+      String? store, // Asumo que el filtro por marca es por 'store'
+    }) async {
+
+    // 1. Definición de la consulta base
+    var query = _firestore.collection('posts').limit(limit);
+
+    // 2. Aplicar filtros WHERE
+    // Filtro de categoría
     if (category != null && category != "Todos") {
       query = query.where('category', isEqualTo: category);
+    }
+    // Filtro por tienda/marca
+    if (store != null && store != "Todas") {
+      query = query.where('store', isEqualTo: store);
+    }
+    // Filtro por Tipo de Promoción (Si el campo existe y es filtrable)
+    if (promoType != null && promoType != "Todos") {
+      // Se asume que tienes un campo en Post llamado 'promoType' con el valor '2x1', '50% OFF', etc.
+    query = query.where('promoType', isEqualTo: promoType);
+    }
+    // Filtro por estado del post (Liquidación/Activa)
+    if (status != null && status != "Todos") {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    // 3. Aplicar ordenamiento y rango de precios (requiere el mismo campo)
+    // Si estamos ordenando por precio, aplicamos el rango aquí.
+    if (orderByField == 'discountPrice') {
+    // Si se usa rango de precios, el orderByField DEBE SER 'discountPrice'
+      if (minPrice != null) {
+      query = query.where('discountPrice', isGreaterThanOrEqualTo: minPrice);
+      }
+    if (maxPrice != null) {
+      query = query.where('discountPrice', isLessThanOrEqualTo: maxPrice);
+    }
+     // Aplicamos el ordenamiento por precio
+      query = query.orderBy('discountPrice', descending: descending);
+      // Si tenemos un índice compuesto, podemos agregar otro ordenamiento, 
+      // pero por ahora, respetamos la limitación de un solo campo para where y order
+
+  } else {
+    // Si no estamos ordenando por precio, ordenamos por el campo elegido.
+    // IMPORTANTE: Si usas rango de precios y no ordenas por 'discountPrice', 
+    // Firestore te requerirá crear un índice compuesto, y el orderByField 
+    // DEBE coincidir con los campos de tu filtro 'where' (si los hay). 
+    // Para simplificar, asumimos que si hay rango, ordenamos por precio.
+    query = query.orderBy(orderByField, descending: descending);
+    }
+
+
+   // 4. Paginación
+  if (lastVisible != null) {
+    query = query.startAfterDocument(lastVisible);
     }
 
     final snapshot = await query.get();
@@ -69,6 +125,10 @@ class PostRepository {
       'lastVisible': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
     };
   }
+
+// ... (resto del código)
+
+// ... resto del código
 
   Future<Post?> getPostFuture(String postId) async {
     final doc = await _firestore.collection('posts').doc(postId).get();
