@@ -67,11 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '%',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
-                  ),
+                   Image.asset(
+        'assets/images/offerapplogopng.png',
+        height: 120,
+      ),
                   const SizedBox(height: 40),
                   TextFormField(
                     controller: _emailController,

@@ -19,8 +19,6 @@ void main() async {
   await initializeDateFormatting('es_ES', null);
   
 
-
-  // Create instances of repositories and services
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
   final sessionManager = SessionManager();
@@ -61,8 +59,6 @@ class MyApp extends StatelessWidget {
         Provider.value(value: firebaseMessaging),
         
 
-
-        // 2. Notifiers that depend on the services above.
         ChangeNotifierProvider(
           create: (context) => ThemeNotifier(sessionManager),
         ),
@@ -72,9 +68,6 @@ class MyApp extends StatelessWidget {
         ),
         
 
-
-        // 3. MainNotifier depends on the user from AuthNotifier. It's only available when logged in.
-        // ChangeNotifierProxyProvider is the perfect tool for this.
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
           create: (_) => null, // Initially null, created on auth success.
           update: (context, authNotifier, previousMainNotifier) {

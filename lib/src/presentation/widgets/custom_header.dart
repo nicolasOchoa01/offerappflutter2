@@ -1,7 +1,5 @@
 
 import 'package:flutter/material.dart';
-import 'package:myapp/src/data/repositories/auth_repository.dart';
-import 'package:provider/provider.dart';
 
 class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
   final String username;
