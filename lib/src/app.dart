@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:myapp/src/navigation/app_router.dart';
-import 'services/auth_service.dart';
+import 'package:myapp/src/data/repositories/auth_repository.dart';
+import 'package:myapp/src/data/services/session_manager.dart';
 import 'package:myapp/src/application/auth/auth_notifier.dart';
-
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -14,8 +14,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<AuthService>(
-          create: (_) => AuthService(),
+        Provider<AuthRepository>(
+          create: (_) => AuthRepository(),
+        ),
+        Provider<SessionManager>(
+          create: (_) => SessionManager(),
+        ),
+        Provider<FirebaseMessaging>(
+          create: (_) => FirebaseMessaging.instance,
+        ),
+        ChangeNotifierProvider<AuthNotifier>(
+          create: (context) => AuthNotifier(
+            context.read<AuthRepository>(),
+            context.read<SessionManager>(),
+            context.read<FirebaseMessaging>(),
+          ),
         ),
       ],
       child: Builder(

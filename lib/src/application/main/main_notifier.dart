@@ -43,6 +43,9 @@ class MainNotifier with ChangeNotifier {
 
   bool? _isDarkTheme;
   bool? get isDarkTheme => _isDarkTheme;
+  
+  String _orderByField = 'timestamp';
+  bool _descending = true;
 
   Post? get selectedPost {
     if (_selectedPostId == null) return null;
@@ -118,6 +121,13 @@ class MainNotifier with ChangeNotifier {
     _searchQuery = newQuery;
     _applyFilters();
   }
+    // Métodos para cambiar el orden
+    void setSortOption(String field, bool descending) {
+        _orderByField = field;
+        _descending = descending;
+        refreshPosts(); // Recargar los posts con el nuevo orden
+    }
+
 
   Future<void> loadMorePosts() async {
     if (_isLoading || _allPostsLoaded) return;
@@ -129,6 +139,8 @@ class MainNotifier with ChangeNotifier {
       final result = await _postRepository.getPosts(
         lastVisible: _lastVisiblePost,
         category: _selectedCategory,
+        orderByField: _orderByField,
+        descending: _descending,
       );
       final newPosts = result['posts'] as List<Post>;
       final newLastVisible = result['lastVisible'] as DocumentSnapshot?;

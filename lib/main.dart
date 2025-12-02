@@ -109,7 +109,7 @@ class MyApp extends StatelessWidget {
             darkTheme: ThemeData(
               useMaterial3: true,
               colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue,
+                seedColor: const Color.fromARGB(255, 52, 161, 224),
                 brightness: Brightness.dark,
               ),
             ),
