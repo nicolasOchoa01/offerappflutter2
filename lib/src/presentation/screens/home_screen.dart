@@ -21,11 +21,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Use a post-frame callback to safely access the provider.
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final mainNotifier = context.read<MainNotifier?>();
       _scrollController.addListener(() {
-        // Load more when the user is near the end of the list
+
         if (_scrollController.position.maxScrollExtent ==
             _scrollController.position.pixels) {
           mainNotifier?.loadMorePosts();
@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch for the MainNotifier, which is only available when logged in.
+
     final mainNotifier = context.watch<MainNotifier?>();
     // Read the AuthNotifier to perform actions like logging out.
     final authNotifier = context.read<AuthNotifier>();
@@ -72,10 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () => Future.sync(mainNotifier.refreshPosts), // Use the notifier's refresh method
         child: ListView.builder(
           controller: _scrollController,
-          // Add 1 to the item count for the loading indicator at the bottom
+
           itemCount: mainNotifier.posts.length + 1,
           itemBuilder: (context, index) {
-            // If it's the last item, show the loading indicator if applicable
+
             if (index == mainNotifier.posts.length) {
               if (mainNotifier.isLoading) {
                 return const Center(
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }
-              // If not loading and the list is empty, show the message
+
               if (mainNotifier.posts.isEmpty) {
                 return const Center(
                   child: Padding(
@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }
-              // Otherwise, it's an empty space at the end
+
               return const SizedBox.shrink();
             }
 
