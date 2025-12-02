@@ -404,7 +404,13 @@ class _PostInfoSection extends StatelessWidget {
           label: const Text('Favorito'),
         ),
         OutlinedButton.icon(
-          onPressed: () => SharePlus.instance.share('¡Mira esta oferta en OfferApp! ${post.description} por solo \$${post.discountPrice}' as ShareParams),
+          onPressed: () => Share.share(
+  '¡Mirá esta oferta en OfferApp! '
+  '${post.description} por solo \$${post.discountPrice.toStringAsFixed(2)} '
+  'en ${post.location}. '
+  '👉 https://offerapp.com/post/${post.id}',
+)//SharePlus.instance.share('¡Mira esta oferta en OfferApp! ${post.description} por solo \$${post.discountPrice}' as ShareParams)
+,
           icon: const Icon(Icons.share),
           label: const Text('Compartir'),
         ),

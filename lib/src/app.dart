@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'routing/app_router.dart';
+import 'package:myapp/src/navigation/app_router.dart';
 import 'services/auth_service.dart';
+import 'package:myapp/src/application/auth/auth_notifier.dart';
+
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -17,7 +20,8 @@ class MyApp extends StatelessWidget {
       ],
       child: Builder(
         builder: (context) {
-          final router = AppRouter(context).router;
+          final authNotifier = context.watch<AuthNotifier>();
+          final router = AppRouter(authNotifier: authNotifier).router;
           return MaterialApp.router(
             routerConfig: router,
             title: 'Flutter App',
