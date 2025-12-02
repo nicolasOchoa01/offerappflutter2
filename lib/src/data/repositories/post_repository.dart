@@ -44,7 +44,14 @@ class PostRepository {
         .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildPostFromDoc)));
   }
 
-  Future<Map<String, dynamic>> getPosts({DocumentSnapshot? lastVisible, int limit = 10, String? category}) async {
+  Future<Map<String, dynamic>> getPosts({
+      DocumentSnapshot? lastVisible, 
+      int limit = 10, 
+      String? category, 
+      // 🔧 NUEVO: Parámetros para ordenar
+      String orderByField = 'timestamp', // Campo por defecto
+      bool descending = true, // Dirección por defecto
+    }) async {
     var query = _firestore.collection('posts').orderBy('timestamp', descending: true).limit(limit);
 
     if (lastVisible != null) {
