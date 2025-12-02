@@ -12,13 +12,14 @@ import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/data/services/session_manager.dart';
 import 'package:myapp/src/navigation/app_router.dart';
 import 'package:provider/provider.dart';
+import 'package:myapp/src/services/firebase_messaging_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('es_ES', null);
-  
 
+  await FirebaseMessagingService().initialize();
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
   final sessionManager = SessionManager();
