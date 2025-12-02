@@ -112,7 +112,8 @@ class PostRepository {
       required double price,
       required double discountPrice,
       required String category,
-      required String store
+      required String store,
+      required String status,
     }) async {
     await _firestore.collection('posts').doc(postId).update({
       'description': description,
@@ -120,6 +121,7 @@ class PostRepository {
       'discountPrice': discountPrice,
       'category': category,
       'store': store,
+      'status': status,
     });
   }
 

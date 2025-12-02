@@ -204,27 +204,30 @@ class MainNotifier with ChangeNotifier {
   Future<void> loadUserProfile(String userId) async {
     if (userId.isEmpty) return;
 
-    _profileCommentsSubscription?.cancel();
+    // Solución: Limpiar incondicionalmente el estado del perfil antes de cada carga.
+    // Esto garantiza que la UI siempre muestre un estado de carga y evita datos "rancios".
     _profileUser = null;
     _profileUserPosts = [];
     _profileUserFavorites = [];
     _profileUserComments = [];
-    notifyListeners();
+    _profileCommentsSubscription?.cancel();
+    notifyListeners(); // Forzar la actualización a estado de carga.
 
     try {
-      final profileToLoad = userId == _user.id ? _user : await _authRepository.getUser(userId);
+      final profileToLoad = await _authRepository.getUser(userId);
+
       if (profileToLoad == null) return;
 
       _profileUser = profileToLoad;
-      notifyListeners();
-
+      
       _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
-      notifyListeners();
-
       if (profileToLoad.favorites.isNotEmpty) {
         _profileUserFavorites = await _postRepository.getFavoritePosts(profileToLoad.favorites);
-        notifyListeners();
+      } else {
+        _profileUserFavorites = [];
       }
+
+      notifyListeners();
 
       _profileCommentsSubscription = _postRepository.getCommentsForUserStream(profileToLoad.id).listen((comments) {
           _profileUserComments = comments;
@@ -237,6 +240,7 @@ class MainNotifier with ChangeNotifier {
         }
     }
   }
+
 
 
    Future<void> refreshCurrentUser() async {
@@ -368,6 +372,7 @@ class MainNotifier with ChangeNotifier {
     double discountPrice,
     String category,
     String store,
+    String status,
   ) async {
     try {
       await _postRepository.updatePostDetails(
@@ -377,6 +382,7 @@ class MainNotifier with ChangeNotifier {
         discountPrice: discountPrice,
         category: category,
         store: store,
+        status: status,
       );
       final updatedPost = await _postRepository.getPostFuture(postId);
       if (updatedPost != null) {
