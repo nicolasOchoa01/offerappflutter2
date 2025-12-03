@@ -12,6 +12,8 @@ class MainNotifier with ChangeNotifier {
   final PostRepository _postRepository;
   final AuthRepository _authRepository;
 
+  bool _isDisposed = false;
+
   User _user;
   User get user => _user;
 
@@ -93,24 +95,38 @@ class MainNotifier with ChangeNotifier {
   MainNotifier(this._user, this._postRepository, this._authRepository) {
     refreshPosts();
     _authRepository.getUser(_user.id).then((fetchedUser) {
-      if (fetchedUser != null) {
+      if (!_isDisposed && fetchedUser != null) {
         _user = fetchedUser;
-        notifyListeners();
+        _safeNotifyListeners();
       }
     });
-    _myCommentsSubscription = _postRepository.getCommentsStream(_user.id).listen((comments) {
-      _myComments = comments;
-      notifyListeners();
+    _myCommentsSubscription = _postRepository.getCommentsForUserStream(_user.id).listen((comments) {
+      if (!_isDisposed) {
+        _myComments = comments;
+        _safeNotifyListeners();
+      }
     });
   }
 
-  Future<void> signOut() async {
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      try {
+        notifyListeners();
+      } catch (e) {
+        if (kDebugMode) {
+          print("Caught error during notifyListeners: $e");
+        }
+      }
+    }
+  }
+
+  Future<void> logout() async {
     await _authRepository.logout();
   }
 
   void onThemeChange(bool? isDark) {
     _isDarkTheme = isDark;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void updateSearchQuery(String newQuery) {
@@ -122,7 +138,7 @@ class MainNotifier with ChangeNotifier {
     if (_isLoading || _allPostsLoaded) return;
 
     _isLoading = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final result = await _postRepository.getPosts(
@@ -145,7 +161,7 @@ class MainNotifier with ChangeNotifier {
       }
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -164,14 +180,16 @@ class MainNotifier with ChangeNotifier {
     } else {
       _commentsSubscription?.cancel();
     }
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void _loadComments(String postId) {
     _commentsSubscription?.cancel();
     _commentsSubscription = _postRepository.getCommentsStream(postId).listen((comments) {
-      _comments = comments;
-      notifyListeners();
+      if (!_isDisposed) {
+        _comments = comments;
+        _safeNotifyListeners();
+      }
     });
   }
 
@@ -188,32 +206,37 @@ class MainNotifier with ChangeNotifier {
     _profileUserPosts = [];
     _profileUserFavorites = [];
     _profileUserComments = [];
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final profileToLoad = userId == _user.id ? _user : await _authRepository.getUser(userId);
+      if (_isDisposed) return;
       _profileUser = profileToLoad;
 
       if (profileToLoad != null) {
         _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
+        if (_isDisposed) return;
         _profileUserFavorites = await _postRepository.getFavoritePosts(profileToLoad.favorites);
-        _profileCommentsSubscription = _postRepository.getCommentsStream(profileToLoad.id).listen((comments) {
+        if (_isDisposed) return;
+        _profileCommentsSubscription = _postRepository.getCommentsForUserStream(profileToLoad.id).listen((comments) {
+          if (!_isDisposed) {
             _profileUserComments = comments;
-            notifyListeners();
+            _safeNotifyListeners();
+          }
         });
       }
-    } catch(e) {
-        if (kDebugMode) {
-          print("Error loading user profile: $e");
-        }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error loading user profile: $e");
+      }
     }
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> refreshCurrentUser() async {
     try {
       final refreshedUser = await _authRepository.getUser(_user.id);
-      if (refreshedUser != null) {
+      if (!_isDisposed && refreshedUser != null) {
         _user = refreshedUser;
         _applyFilters();
       }
@@ -226,33 +249,33 @@ class MainNotifier with ChangeNotifier {
 
   Future<void> followUser(String followedUserId) async {
     try {
-        await _authRepository.followUser(followerId: _user.id, followingId: followedUserId);
-        await refreshCurrentUser();
-        final refreshedProfileUser = await _authRepository.getUser(followedUserId);
-        if(refreshedProfileUser != null) {
-            _profileUser = refreshedProfileUser;
-            notifyListeners();
-        }
+      await _authRepository.followUser(followerId: _user.id, followingId: followedUserId);
+      await refreshCurrentUser();
+      final refreshedProfileUser = await _authRepository.getUser(followedUserId);
+      if (!_isDisposed && refreshedProfileUser != null) {
+        _profileUser = refreshedProfileUser;
+        _safeNotifyListeners();
+      }
     } catch (e) {
-        if (kDebugMode) {
-            print("Failed to unfollow user: $e");
-        }
+      if (kDebugMode) {
+        print("Failed to unfollow user: $e");
+      }
     }
   }
 
   Future<void> unfollowUser(String followedUserId) async {
     try {
-        await _authRepository.unfollowUser(followerId: _user.id, followingId: followedUserId);
-        await refreshCurrentUser();
-        final refreshedProfileUser = await _authRepository.getUser(followedUserId);
-        if(refreshedProfileUser != null) {
-            _profileUser = refreshedProfileUser;
-            notifyListeners();
-        }
+      await _authRepository.unfollowUser(followerId: _user.id, followingId: followedUserId);
+      await refreshCurrentUser();
+      final refreshedProfileUser = await _authRepository.getUser(followedUserId);
+      if (!_isDisposed && refreshedProfileUser != null) {
+        _profileUser = refreshedProfileUser;
+        _safeNotifyListeners();
+      }
     } catch (e) {
-        if (kDebugMode) {
-            print("Failed to unfollow user: $e");
-        }
+      if (kDebugMode) {
+        print("Failed to unfollow user: $e");
+      }
     }
   }
 
@@ -261,7 +284,7 @@ class MainNotifier with ChangeNotifier {
       await _authRepository.updateUserProfileImage(uid: _user.id, imageFile: imageFile);
       await refreshCurrentUser();
     } catch (e) {
-      if(kDebugMode) {
+      if (kDebugMode) {
         print("Error updating profile image: $e");
       }
     }
@@ -351,7 +374,7 @@ class MainNotifier with ChangeNotifier {
         status: status,
       );
       final updatedPost = await _postRepository.getPostFuture(postId);
-      if (updatedPost != null) {
+      if (!_isDisposed && updatedPost != null) {
         final index = _allPosts.indexWhere((p) => p.id == postId);
         if (index != -1) {
           _allPosts[index] = updatedPost;
@@ -366,27 +389,31 @@ class MainNotifier with ChangeNotifier {
   }
 
   void toggleFavorite(String postId) {
-      final isCurrentlyFavorite = _user.favorites.contains(postId);
-      final originalFavorites = List<String>.from(_user.favorites);
+    final isCurrentlyFavorite = _user.favorites.contains(postId);
+    final originalFavorites = List<String>.from(_user. favorites);
 
-      if (isCurrentlyFavorite) {
-        _user.favorites.remove(postId);
-      } else {
-        _user.favorites.add(postId);
-      }
-      notifyListeners();
+    if (isCurrentlyFavorite) {
+      _user.favorites.remove(postId);
+    } else {
+      _user.favorites.add(postId);
+    }
+    _safeNotifyListeners();
 
-      if (isCurrentlyFavorite) {
-        _authRepository.removeFavorite(userId: _user.id, postId: postId).catchError((_){
-            _user = _user.copyWith(favorites: originalFavorites);
-            notifyListeners();
-        });
-      } else {
-        _authRepository.addFavorite(userId: _user.id, postId: postId).catchError((_){
-            _user = _user.copyWith(favorites: originalFavorites);
-            notifyListeners();
-        });
-      }
+    if (isCurrentlyFavorite) {
+      _authRepository.removeFavorite(userId: _user.id, postId: postId).catchError((_) {
+        if (!_isDisposed) {
+          _user = _user.copyWith(favorites: originalFavorites);
+          _safeNotifyListeners();
+        }
+      });
+    } else {
+      _authRepository.addFavorite(userId: _user.id, postId: postId).catchError((_) {
+        if (!_isDisposed) {
+          _user = _user.copyWith(favorites: originalFavorites);
+          _safeNotifyListeners();
+        }
+      });
+    }
   }
 
   Future<void> voteOnPost(String postId, int value) async {
@@ -397,7 +424,7 @@ class MainNotifier with ChangeNotifier {
         value: value,
       );
       final updatedPost = await _postRepository.getPostFuture(postId);
-      if (updatedPost != null) {
+      if (!_isDisposed && updatedPost != null) {
         final postIndex = _allPosts.indexWhere((p) => p.id == postId);
         if (postIndex != -1) {
           _allPosts[postIndex] = updatedPost;
@@ -417,6 +444,7 @@ class MainNotifier with ChangeNotifier {
   }
 
   void _applyFilters() {
+    if (_isDisposed) return;
     List<Post> filteredPosts = _allPosts;
 
     if (_selectedFeedTab == 1) {
@@ -436,11 +464,12 @@ class MainNotifier with ChangeNotifier {
     }
 
     _posts = filteredPosts;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _commentsSubscription?.cancel();
     _profileCommentsSubscription?.cancel();
     _myCommentsSubscription?.cancel();

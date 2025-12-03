@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:myapp/src/application/auth/auth_notifier.dart';
 import 'package:myapp/src/application/main/main_notifier.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
 import 'package:myapp/src/domain/entities/post.dart';
@@ -30,7 +29,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     super.initState();
     _setupTabController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MainNotifier>().loadUserProfile(widget.userId);
+      if (mounted) {
+        context.read<MainNotifier>().loadUserProfile(widget.userId);
+      }
     });
   }
 
@@ -38,19 +39,23 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.userId != oldWidget.userId) {
+      // The user has changed. We need to rebuild the state properly.
+      // 1. Dispose the old tab controller.
+      _tabController.dispose();
+      // 2. Setup a new tab controller for the new user.
       _setupTabController();
-      context.read<MainNotifier>().loadUserProfile(widget.userId);
+      // 3. Load the new user's profile data.
+      if (mounted) {
+        context.read<MainNotifier>().loadUserProfile(widget.userId);
+      }
     }
   }
 
   void _setupTabController() {
-    final isMyProfile = context.read<MainNotifier>().user.id == widget.userId;
-    _tabController = TabController(length: isMyProfile ? 3 : 2, vsync: this, initialIndex: 0);
-    _tabController.addListener(() {
-        if (_tabController.indexIsChanging) {
-            setState(() {});
-        }
-    });
+    final notifier = context.read<MainNotifier>();
+    final isMyProfile = notifier.user.id == widget.userId;
+    final tabCount = isMyProfile ? 3 : 2;
+    _tabController = TabController(length: tabCount, vsync: this, initialIndex: 0);
   }
 
   @override
@@ -63,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
-    if (!mounted) return; // Guard against async gaps
+    if (!mounted) return; 
 
     context.read<MainNotifier>().updateProfileImage(File(image.path));
   }
@@ -71,14 +76,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<MainNotifier>();
-    final authNotifier = context.read<AuthNotifier>();
     final profileUser = notifier.profileUser;
     final currentUser = notifier.user;
     final isMyProfile = currentUser.id == widget.userId;
     final colorScheme = Theme.of(context).colorScheme;
     final iconTint = colorScheme.onPrimary;
 
-    final int expectedTabCount = isMyProfile ? 3 : 2;
+    // Safeguard to ensure TabController is in sync if the profile type changes.
+    final expectedTabCount = isMyProfile ? 3 : 2;
     if (_tabController.length != expectedTabCount) {
       _tabController.dispose();
       _setupTabController();
@@ -101,8 +106,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'logout') {
-                 authNotifier.logout();
-                 context.go('/login');
+                 context.read<MainNotifier>().logout();
+              }
+              if (value == 'profile') {
+                 final currentUserId = context.read<MainNotifier>().user.id;
+                 context.go('/profile/$currentUserId');
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -112,12 +120,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 child: Text('Hola, ${currentUser.username}', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'profile',
-                enabled: !isMyProfile,
-                onTap: !isMyProfile ? () => context.go('/profile/${currentUser.id}') : null,
-                child: const Text('Ver Mi Perfil'),
-              ),
+              if (!isMyProfile)
+                const PopupMenuItem<String>(
+                  value: 'profile',
+                  child: Text('Ver Mi Perfil'),
+                ),
               const PopupMenuItem<String>(
                 value: 'logout',
                 child: Text('Cerrar Sesión'),
@@ -171,11 +178,20 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       _PostListView(posts: notifier.profileUserPosts, notifier: notifier),
       _CommentListView(
         comments: isMyProfile ? notifier.myComments : notifier.profileUserComments,
-        onPostClick: (postId) => context.push('/post/$postId'),
+        onPostClick: (postId) {
+          final post = context.read<MainNotifier>().getPostById(postId);
+          if (post != null) {
+            context.push('/post/${post.id}', extra: post);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Post no encontrado o no disponible.')),
+            );
+          }
+        },
       ),
     ];
     if (isMyProfile) {
-      views.add(_PostListView(posts: notifier.profileUserFavorites, notifier: notifier));
+      views.add(_PostListView(posts: notifier.favoritePosts, notifier: notifier));
     }
     return views;
   }
