@@ -80,6 +80,13 @@ class PostRepository {
     }
 
     final docRef = _firestore.collection('posts').doc();
+    final imageUrl = await _uploadImageToCloudinary(imageFile);
+
+    final Map<String, dynamic>? userDataForFCM = post.user != null ? {
+      'uid': post.user!.id,
+      'username': post.user!.username,
+    } : null;
+    // Manually create the map to ensure no nested User object is saved.
     String imageUrl;
     if (kIsWeb) {
       imageUrl = await _uploadImageBytesToCloudinary(imageBytes!, docRef.id);
@@ -88,6 +95,7 @@ class PostRepository {
     }
 
     final postData = {
+      'user': userDataForFCM,
       'userId': post.userId,
       'description': post.description,
       'imageUrl': imageUrl,

@@ -43,29 +43,29 @@ class AppRouter {
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                    path: '/profile',
-                    builder: (context, state) {
-                      final authState = authNotifier.state;
-                      if (authState is AuthSuccess) {
-                        return ProfileScreen(userId: authState.user.id);
-                      }
-                      // This part should not be reached if redirect is working correctly
-                      return const Scaffold(
-                          body: Center(child: CircularProgressIndicator()));
-                    },
-                    routes: [
-                      GoRoute(
-                        path: ':userId',
-                        builder: (context, state) {
-                          final userId = state.pathParameters['userId']!;
-                          return ProfileScreen(userId: userId);
-                        },
-                      ),
-                    ]),
+                  path: '/profile-tab',
+                  builder: (context, state) {
+                    final authState = authNotifier.state;
+                    if (authState is AuthSuccess) {
+
+                      return ProfileScreen(userId: authState.user.id);
+                    }
+                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  },
+                ),
               ],
             ),
           ],
         ),
+
+    GoRoute(
+      path: '/profile/:userId',
+      builder: (context, state) {
+        final userId = state.pathParameters['userId']!;
+        return ProfileScreen(userId: userId);
+      },
+    ),
+
         GoRoute(
           path: '/post/:postId',
           builder: (context, state) {

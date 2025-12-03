@@ -52,14 +52,15 @@ class FirebaseMessagingService {
 
       // Manejar mensajes cuando la app está en FOREGROUND
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final RemoteNotification? notification = message.notification;
         // Lógica de `onMessageReceived` de tu Kotlin
-        final customTitle = message.data['custom_title'] ?? "Nuevo Post Genérico";
-        final customBody = message.data['custom_body'] ?? "Se ha publicado una oferta sin detalles.";
+        final title = notification?.title ?? message.data['custom_title'] ?? "Nuevo Post Genérico";
+        final body = notification?.body ??message.data['custom_body'] ?? "Se ha publicado una oferta sin detalles.";
 
-        debugPrint("FCM_RECEIVE (Foreground): Título: $customTitle");
+        debugPrint("FCM_RECEIVE (Foreground): Título: $title");
 
         // Llamar a `sendNotification` de Kotlin -> Usar `flutter_local_notifications`
-        _showLocalNotification(customTitle, customBody);
+        _showLocalNotification(title, body);
       });
 
       // Manejar mensajes cuando la app abre desde un mensaje (Background/Terminated)
