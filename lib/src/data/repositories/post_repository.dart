@@ -35,29 +35,47 @@ class PostRepository {
     return comment.copyWith(user: user);
   }
 
-  Stream<List<Post>> getPostsStream() {
-    return _firestore
-        .collection('posts')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildPostFromDoc)));
-  }
-
   Future<Map<String, dynamic>> getPosts({
-      DocumentSnapshot? lastVisible, 
-      int limit = 10, 
-      String? category, 
-      String orderByField = 'timestamp',
-      bool descending = true,
-    }) async {
-    var query = _firestore.collection('posts').orderBy(orderByField, descending: descending).limit(limit);
+    DocumentSnapshot? lastVisible,
+    int limit = 10,
+    String sortOption = 'timestamp_desc',
+    String? category, // <-- PARAMETER RESTORED
+  }) async {
+    Query query = _firestore.collection('posts');
 
-    if (lastVisible != null) {
-      query = query.startAfterDocument(lastVisible);
-    }
+    // Apply category filter first (if it's not "Todos")
     if (category != null && category != "Todos") {
       query = query.where('category', isEqualTo: category);
     }
+
+    // Handle sorting
+    final parts = sortOption.split('_');
+    final field = parts[0];
+    final direction = parts[1];
+
+    String orderByField;
+    bool descending;
+
+    switch (field) {
+      case 'score':
+        orderByField = 'totalScore';
+        break;
+      case 'price':
+        orderByField = 'discountPrice';
+        break;
+      default: // timestamp
+        orderByField = 'timestamp';
+    }
+    descending = direction == 'desc';
+
+    query = query.orderBy(orderByField, descending: descending);
+
+    // Handle pagination
+    if (lastVisible != null) {
+      query = query.startAfterDocument(lastVisible);
+    }
+
+    query = query.limit(limit);
 
     final snapshot = await query.get();
     final posts = await Future.wait(snapshot.docs.map(_buildPostFromDoc));
@@ -104,6 +122,7 @@ class PostRepository {
       'timestamp': FieldValue.serverTimestamp(),
       'status': post.status,
       'scores': [],
+      'totalScore': 0, 
     };
 
     await docRef.set(postData);
@@ -113,15 +132,15 @@ class PostRepository {
     await _firestore.collection('posts').doc(postId).delete();
   }
 
-    Future<void> updatePostDetails({
-      required String postId, 
-      required String description,
-      required double price,
-      required double discountPrice,
-      required String category,
-      required String store,
-      required String status,
-    }) async {
+  Future<void> updatePostDetails({
+    required String postId,
+    required String description,
+    required double price,
+    required double discountPrice,
+    required String category,
+    required String store,
+    required String status,
+  }) async {
     await _firestore.collection('posts').doc(postId).update({
       'description': description,
       'price': price,
@@ -133,7 +152,7 @@ class PostRepository {
   }
 
   Future<String> _uploadImageFileToCloudinary(File imageFile) async {
-     try {
+    try {
       CloudinaryResponse response = await _cloudinary.uploadFile(
         CloudinaryFile.fromFile(imageFile.path, resourceType: CloudinaryResourceType.Image),
       );
@@ -154,7 +173,7 @@ class PostRepository {
       throw Exception('Error al subir la imagen: ${e.toString()}');
     }
   }
-  
+
   Stream<List<Comment>> getCommentsStream(String postId) {
     return _firestore
         .collection('posts')
@@ -166,12 +185,12 @@ class PostRepository {
   }
 
   Stream<List<Comment>> getCommentsForUserStream(String userId) {
-  return _firestore
-      .collectionGroup('comments')
-      .where('userId', isEqualTo: userId)
-      .orderBy('timestamp', descending: true)
-      .snapshots()
-      .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildCommentFromDoc)));
+    return _firestore
+        .collectionGroup('comments')
+        .where('userId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildCommentFromDoc)));
   }
 
   Future<void> addComment({required String postId, required String text, required String userId}) async {
@@ -193,12 +212,12 @@ class PostRepository {
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(postRef);
       if (!snapshot.exists) return;
-      
+
       List<dynamic> scoresRaw = List<dynamic>.from(snapshot.data()?['scores'] ?? []);
       List<Map<String, dynamic>> scores = scoresRaw.map((s) => Map<String, dynamic>.from(s as Map)).toList();
 
       int existingVoteIndex = scores.indexWhere((s) => s['userId'] == userId);
-      
+
       if (existingVoteIndex != -1) {
         if (scores[existingVoteIndex]['value'] == value) {
           scores.removeAt(existingVoteIndex);
@@ -208,8 +227,14 @@ class PostRepository {
       } else {
         scores.add({'userId': userId, 'value': value});
       }
+
       
-      transaction.update(postRef, {'scores': scores});
+      int totalScore = scores.fold(0, (sum, item) => sum + (item['value'] as int));
+
+      transaction.update(postRef, {
+        'scores': scores,
+        'totalScore': totalScore,
+      });
     });
   }
 
@@ -222,9 +247,10 @@ class PostRepository {
     return Future.wait(snapshot.docs.map(_buildPostFromDoc));
   }
 
-  Future<List<Post>> getFavoritePosts(List<String> postIds) async {
+    Future<List<Post>> getFavoritePosts(List<String> postIds) async {
     if (postIds.isEmpty) return [];
 
+    
     List<Post> favoritePosts = [];
     for (var i = 0; i < postIds.length; i += 30) {
       final sublist = postIds.sublist(i, i + 30 > postIds.length ? postIds.length : i + 30);
@@ -240,6 +266,7 @@ class PostRepository {
       favoritePosts.addAll(posts);
     }
     
+   
     favoritePosts.sort((a, b) {
       if (a.timestamp == null && b.timestamp == null) return 0;
       if (a.timestamp == null) return 1; 

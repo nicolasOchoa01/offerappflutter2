@@ -26,8 +26,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<AuthNotifier>(
           create: (context) => AuthNotifier(
             context.read<AuthRepository>(),
-            context.read<SessionManager>(),
-            context.read<FirebaseMessaging>(),
+            context.read<FirebaseMessaging>(), // CORRECTED
           ),
         ),
       ],

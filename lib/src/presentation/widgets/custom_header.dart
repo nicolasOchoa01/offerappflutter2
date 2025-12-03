@@ -120,11 +120,38 @@ class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends StatefulWidget {
   final String query;
   final ValueChanged<String> onQueryChange;
 
   const _SearchBar({required this.query, required this.onQueryChange});
+
+  @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.query);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_SearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.query != oldWidget.query && widget.query != _controller.text) {
+      _controller.text = widget.query;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +159,8 @@ class _SearchBar extends StatelessWidget {
     return SizedBox(
       height: 48,
       child: TextField(
-        onChanged: onQueryChange,
-        controller: TextEditingController(text: query),
+        onChanged: widget.onQueryChange,
+        controller: _controller,
         decoration: InputDecoration(
           hintText: 'Buscar productos...',
           prefixIcon: const Icon(Icons.search),

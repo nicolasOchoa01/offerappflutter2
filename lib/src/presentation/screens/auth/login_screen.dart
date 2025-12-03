@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-// FIX: Import the correct AuthNotifier, not the obsolete AuthService
+
 import 'package:myapp/src/application/auth/auth_notifier.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -41,9 +41,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text,
         _passwordController.text,
       );
-      // Navigation is handled automatically by the GoRouter redirect based on AuthNotifier's state.
+      
     } catch (e) {
-      // The AuthNotifier now throws specific errors, which we can display.
+      
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Error al iniciar sesión: ${e.toString()}')),
       );
@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         value!.isEmpty ? 'Por favor ingrese su contraseña' : null,
                   ),
                   const SizedBox(height: 24),
-                  // Show a loading indicator on the button when signing in
+                  
                   _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton(

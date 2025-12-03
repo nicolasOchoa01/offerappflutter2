@@ -29,6 +29,9 @@ class AuthRepository {
             toFirestore: (user, _) => user.toMap(),
           );
 
+  // Stream que notifica a la app sobre cambios de autenticación en tiempo real.
+  Stream<firebase_auth.User?> get authStateChanges => _authService.authStateChanges;
+  
   firebase_auth.User? get currentUser => _auth.currentUser;
 
   Future<firebase_auth.User?> registerUser(
@@ -142,7 +145,13 @@ class AuthRepository {
     }
   }
 
-  Future<void> logout() async => await _auth.signOut();
+  Future<void> logout() async {
+    try {
+      await _authService.signOut();
+    } catch (e) {
+      throw Exception('Error al cerrar sesión: ${e.toString()}');
+    }
+  }
 
   Future<void> followUser({required String followerId, required String followingId}) async {
     try {
@@ -192,7 +201,6 @@ class AuthRepository {
     try {
       await _authService.updateFCMToken(userId, token);
     } catch (e) {
-      // The service itself might handle logging, but we can rethrow or handle as needed.
       throw Exception('Error al actualizar el token FCM: ${e.toString()}');
     }
   }

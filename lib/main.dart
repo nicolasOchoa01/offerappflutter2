@@ -27,8 +27,6 @@ const lightColorScheme = ColorScheme(
   onError: Colors.white,
   surface: Color(0xFFFCFCFC),
   onSurface: Color(0xFF1C1B1B),
-  background: Color(0xFFFCFCFC),
-  onBackground: Color(0xFF1C1B1B),
 );
 
 const darkColorScheme = ColorScheme(
@@ -43,8 +41,6 @@ const darkColorScheme = ColorScheme(
   onError: Color(0xFF690005),
   surface: Color(0xFF1F1F1F),
   onSurface: Colors.white,
-  background: Color(0xFF121212),
-  onBackground: Colors.white,
 );
 
 // Typography defined from the native app's theme
@@ -65,7 +61,7 @@ void main() async {
   await FirebaseMessagingService().initialize();
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
-  final sessionManager = SessionManager();
+  final sessionManager = SessionManager(); // Kept for ThemeNotifier
   final firebaseMessaging = FirebaseMessaging.instance;
 
   runApp(
@@ -106,15 +102,15 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) =>
-              AuthNotifier(authRepository, sessionManager, firebaseMessaging),
+              AuthNotifier(authRepository, firebaseMessaging), 
         ),
 
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
-          create: (_) => null, // Initially null, created on auth success.
+          create: (_) => null, 
           update: (context, authNotifier, previousMainNotifier) {
             final authState = authNotifier.state;
             if (authState is AuthSuccess) {
-              // When authenticated, create/update MainNotifier.
+              
               if (previousMainNotifier == null ||
                   previousMainNotifier.user.id != authState.user.id) {
                 return MainNotifier(
