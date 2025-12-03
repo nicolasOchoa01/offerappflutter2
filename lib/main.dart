@@ -86,8 +86,10 @@ class MyApp extends StatelessWidget {
                 );
               }
               return previousMainNotifier;
+            }else {
+              previousMainNotifier?.dispose();
+              return null;
             }
-            return null;
           },
         ),
       ],

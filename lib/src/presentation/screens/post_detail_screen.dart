@@ -270,8 +270,14 @@ class _PostInfoSection extends StatelessWidget {
 
     Widget _buildAuthorInfo(BuildContext context, Post post) {
     final sdf = DateFormat('dd MMM yyyy', 'es_ES');
+    final String authorId = post.user?.id ?? '';
     return InkWell(
-      onTap: () => context.push('/profile/${post.user?.id ?? ''}'),
+      onTap: () {
+
+        if (authorId.isNotEmpty) {
+          GoRouter.of(context).go('/profile/$authorId');
+        }
+      },
       child: Row(
         children: [
           CircleAvatar(
@@ -487,7 +493,7 @@ class _CommentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sdf = DateFormat('dd MMM yyyy, HH:mm', 'es_ES');
-
+    final String userId = comment.user?.id ?? '';
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
@@ -498,7 +504,12 @@ class _CommentItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkWell(
-              onTap: () => onProfileClick(comment.user?.id ?? ''),
+              onTap: () {
+                final String userId = comment.user?.id ?? '';
+                if (userId.isNotEmpty) {
+                  onProfileClick(userId);
+                }
+              },
               child: CircleAvatar(
                 radius: 20,
                 backgroundImage: comment.user?.profileImageUrl != null
