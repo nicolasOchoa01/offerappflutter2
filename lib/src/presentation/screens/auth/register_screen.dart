@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:myapp/src/services/auth_service.dart';
+import 'package:myapp/src/application/auth/auth_notifier.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -29,15 +29,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authNotifier = context.read<AuthNotifier>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
-      await authService.createUserWithEmailAndPassword(
+      await authNotifier.register(
         _emailController.text,
         _passwordController.text,
+        _usernameController.text,
       );
-      // La navegación se maneja por el redirect de go_router
+
     } catch (e) {
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Error al crear la cuenta: ${e.toString()}')),
@@ -58,10 +59,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '%',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
+                  Image.asset(
+                    'assets/images/offerapplogopng.png',
+                    height: 120,
                   ),
                   const SizedBox(height: 40),
                   TextFormField(
