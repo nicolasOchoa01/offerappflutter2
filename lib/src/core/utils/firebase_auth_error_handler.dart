@@ -19,7 +19,6 @@ class FirebaseAuthErrorHandler {
         return 'Demasiados intentos fallidos. Inténtalo de nuevo más tarde.';
       case 'operation-not-allowed':
         return 'El inicio de sesión con correo y contraseña no está habilitado.';
-      // Custom exception from our repository logic
       case 'username-already-in-use':
          return 'El nombre de usuario ya está en uso.';
       case 'username-not-found':
@@ -29,15 +28,14 @@ class FirebaseAuthErrorHandler {
     }
   }
 
-  // You can also add a method for other types of exceptions if needed
+  
   static String getGeneralErrorMessage(Exception e) {
      if (e is FirebaseAuthException) {
       return getErrorMessage(e);
     }
-    // Handle custom exception messages thrown from the repository
     final message = e.toString();
     if (message.startsWith("Exception: ")) {
-      return message.substring(11); // Remove "Exception: " part
+      return message.substring(11); 
     }
     return 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.';
   }

@@ -11,7 +11,7 @@ class SideMenu extends StatelessWidget {
     final mainNotifier = context.watch<MainNotifier?>();
     final themeNotifier = context.watch<ThemeNotifier>();
     
-    // List of categories to display in the filter
+    
     final categories = [
       "Todos", "Alimentos", "Tecnología", "Moda", "Deportes", "Construcción",
       "Animales", "Electrodomésticos", "Servicios", "Educación",
@@ -19,7 +19,7 @@ class SideMenu extends StatelessWidget {
     ];
 
     if (mainNotifier == null) {
-      return const Drawer(); // Return an empty drawer if notifier is not ready
+      return const Drawer(); 
     }
 
     return Drawer(
@@ -51,7 +51,7 @@ class SideMenu extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
-                // Create a list tile for each category
+                
                 ...categories.map((category) {
                   final isSelected = mainNotifier.selectedCategory == category;
                   return ListTile(
@@ -71,7 +71,7 @@ class SideMenu extends StatelessWidget {
                   );
                 }),
                 const Divider(height: 20),
-                // Dark mode toggle
+                
                 SwitchListTile(
                   title: Text(
                     'Modo Oscuro',

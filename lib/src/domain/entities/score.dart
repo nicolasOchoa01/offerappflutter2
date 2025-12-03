@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 @immutable
 class Score {
   final String userId;
-  final int value; // +1 for like, -1 for dislike
+  final int value; 
 
   const Score({
     required this.userId,

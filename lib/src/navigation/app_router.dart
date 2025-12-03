@@ -3,11 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/src/application/auth/auth_notifier.dart';
 import 'package:myapp/src/application/auth/auth_state.dart';
 import 'package:myapp/src/domain/entities/post.dart';
-// Corrected Imports for Auth Screens
+
 import 'package:myapp/src/presentation/screens/auth/forgot_password_screen.dart';
 import 'package:myapp/src/presentation/screens/auth/login_screen.dart';
 import 'package:myapp/src/presentation/screens/auth/register_screen.dart';
-// Other screen imports
+
 import 'package:myapp/src/presentation/screens/create_post_screen.dart';
 import 'package:myapp/src/presentation/screens/home_screen.dart';
 import 'package:myapp/src/presentation/screens/main_screen.dart';
@@ -46,7 +46,6 @@ class AppRouter {
                 if (authState is AuthSuccess) {
                   return ProfileScreen(userId: authState.user.id);
                 }
-                // This part should not be reached if redirect is working correctly
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
                 );
@@ -90,9 +89,7 @@ class AppRouter {
     GoRoute(
       path: '/create_post',
       builder: (context, state) {
-        // The redirect logic ensures the user is logged in,
-        // so we can directly return the screen.
-        // The screen itself will use the MainNotifier to get user data.
+        
         return const CreatePostScreen();
       },
     ),

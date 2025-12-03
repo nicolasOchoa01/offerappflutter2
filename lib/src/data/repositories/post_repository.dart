@@ -122,7 +122,7 @@ class PostRepository {
       'timestamp': FieldValue.serverTimestamp(),
       'status': post.status,
       'scores': [],
-      'totalScore': 0, // Initialize totalScore
+      'totalScore': 0, 
     };
 
     await docRef.set(postData);
@@ -228,7 +228,7 @@ class PostRepository {
         scores.add({'userId': userId, 'value': value});
       }
 
-      // Recalculate and update totalScore
+      
       int totalScore = scores.fold(0, (sum, item) => sum + (item['value'] as int));
 
       transaction.update(postRef, {
@@ -250,7 +250,7 @@ class PostRepository {
     Future<List<Post>> getFavoritePosts(List<String> postIds) async {
     if (postIds.isEmpty) return [];
 
-    // Firestore 'in' query limit is 30
+    
     List<Post> favoritePosts = [];
     for (var i = 0; i < postIds.length; i += 30) {
       final sublist = postIds.sublist(i, i + 30 > postIds.length ? postIds.length : i + 30);
@@ -266,7 +266,7 @@ class PostRepository {
       favoritePosts.addAll(posts);
     }
     
-    // Sort locally by timestamp after fetching
+   
     favoritePosts.sort((a, b) {
       if (a.timestamp == null && b.timestamp == null) return 0;
       if (a.timestamp == null) return 1; 

@@ -37,7 +37,7 @@ class _GeneralHomeScreenState extends State<GeneralHomeScreen> {
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: CustomHeader(
-          username: 'Gastón', // o authNotifier.user.username si lo tenés
+          username: 'Gastón', 
           query: '',
           onQueryChange: (value) {
             context.push('/home?filter=$value&order=$sortOption');

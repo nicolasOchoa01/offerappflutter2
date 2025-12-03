@@ -386,7 +386,7 @@ class MainNotifier with ChangeNotifier {
     }
   }
 
-  // --- PRIVATE METHODS ---
+  
 
   void _loadComments(String postId) {
     _commentsSubscription?.cancel();

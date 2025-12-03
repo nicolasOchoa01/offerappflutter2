@@ -87,7 +87,7 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16.0),
-                // Main Content Column
+                
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +140,7 @@ class PostCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const Spacer(), // Pushes prices to the bottom
+                      const Spacer(), 
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
@@ -148,7 +148,7 @@ class PostCard extends StatelessWidget {
                           Text(
                             "\$${post.discountPrice.toStringAsFixed(2)}",
                             style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w900, // ExtraBold equivalent
+                              fontWeight: FontWeight.w900, 
                               color: theme.colorScheme.primary,
                             ),
                           ),
@@ -166,7 +166,7 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8.0),
-                // Score and Favorite Column
+
                 Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,

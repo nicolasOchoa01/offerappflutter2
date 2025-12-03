@@ -102,15 +102,15 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) =>
-              AuthNotifier(authRepository, firebaseMessaging), // CORRECTED
+              AuthNotifier(authRepository, firebaseMessaging), 
         ),
 
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
-          create: (_) => null, // Initially null, created on auth success.
+          create: (_) => null, 
           update: (context, authNotifier, previousMainNotifier) {
             final authState = authNotifier.state;
             if (authState is AuthSuccess) {
-              // When authenticated, create/update MainNotifier.
+              
               if (previousMainNotifier == null ||
                   previousMainNotifier.user.id != authState.user.id) {
                 return MainNotifier(
