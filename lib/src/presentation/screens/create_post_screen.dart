@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -11,7 +13,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 
 class CreatePostScreen extends StatefulWidget {
-  // No longer needs the user passed in, as it will be fetched from the notifier.
   const CreatePostScreen({super.key});
 
   @override
@@ -31,7 +32,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String _location = '';
   double _latitude = 0.0;
   double _longitude = 0.0;
-  File? _image;
+  File? _imageFile;
+  Uint8List? _imageBytes;
   bool _isLoading = false;
   String? _selectedCategory;
   String? _selectedPromotionType;
@@ -86,7 +88,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   void _calculatePrices() {
-    //calcula la promocion para algunos casos
     if (_selectedPromotionType == "Liquidación" || _selectedPromotionType == "Otros" || _selectedPromotionType == null) {
       if (mounted) setState(() {});
       return;
@@ -96,7 +97,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     if (mounted && originalPrice != null) {
       setState(() {
-
         _finalPriceController.text = _getFinalPrice(originalPrice, _selectedPromotionType!)?.toStringAsFixed(2) ?? '';
       });
     }
@@ -113,7 +113,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       default: return null;
     }
   }
-
 
   Future<void> _getCurrentLocation() async {
     if (mounted) setState(() => _isLoading = true);
@@ -148,19 +147,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.camera);
     if (image != null) {
-      if (mounted) {
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
         setState(() {
-          _image = File(image.path);
+          _imageBytes = bytes;
+          _imageFile = null;
+        });
+      } else {
+        setState(() {
+          _imageFile = File(image.path);
+          _imageBytes = null;
         });
       }
     }
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false) || _image == null) {
+    if (!(_formKey.currentState?.validate() ?? false) || (_imageFile == null && _imageBytes == null)) {
       return;
     }
-    //se asegura que el precio final sea menor que el original
     final originalPrice = double.tryParse(_originalPriceController.text) ?? 0.0;
     final finalPrice = double.tryParse(_finalPriceController.text) ?? 0.0;
     if (finalPrice >= originalPrice) {
@@ -175,13 +180,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     final router = GoRouter.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    // Use read to call methods on the notifier, we don't need to watch here.
     final mainNotifier = context.read<MainNotifier>();
 
     try {
       await mainNotifier.addPost(
         description: _descriptionController.text,
-        imageFile: _image!,
+        imageFile: _imageFile,
+        imageBytes: _imageBytes,
         location: _location,
         latitude: _latitude,
         longitude: _longitude,
@@ -205,7 +210,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
   
   bool _isFormValid() {
-    if (_image == null || _selectedCategory == null || _isLoading) return false;
+    if ((_imageFile == null && _imageBytes == null) || _selectedCategory == null || _isLoading) return false;
     if (_originalPriceController.text.isEmpty || _finalPriceController.text.isEmpty) return false;
 
     final originalPrice = double.tryParse(_originalPriceController.text) ?? 0.0;
@@ -216,7 +221,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the notifiers. Use read for actions, watch for rebuilds.
     final mainNotifier = context.read<MainNotifier>();
     final authNotifier = context.read<AuthNotifier>();
 
@@ -244,7 +248,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           context.go('/profile/${mainNotifier.user.id}');
         },
         onSessionClicked: () {
-          authNotifier.logout(); // Correctly call logout on AuthNotifier
+          authNotifier.logout();
           context.go('/login');
         },
       ),
@@ -270,7 +274,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      // Use initialValue instead of the deprecated value
                       initialValue: _selectedPromotionType,
                       hint: const Text('Tipo de Promoción'),
                       decoration: inputDecoration.copyWith(labelText: 'Tipo de Promoción'),
@@ -319,7 +322,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       decoration: inputDecoration.copyWith(labelText: 'Precio Original'),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
-                        // permite ingresar 9 numeros y 2 digitos a lo sumo
                         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                       ],
                       validator: (value) {
@@ -342,7 +344,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      // Use initialValue instead of the deprecated value
                       initialValue: _selectedCategory,
                       hint: const Text('Categoría'),
                       decoration: inputDecoration.copyWith(labelText: 'Categoría'),
@@ -352,9 +353,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     const SizedBox(height: 16),
                     Center(
-                      child: _image == null
-                          ? const Text('No se ha seleccionado ninguna imagen.')
-                          : Image.file(_image!, height: 150, width: 150, fit: BoxFit.cover),
+                      child: kIsWeb
+                          ? _imageBytes == null
+                              ? const Text('No se ha seleccionado ninguna imagen.')
+                              : Image.memory(_imageBytes!, height: 150, width: 150, fit: BoxFit.cover)
+                          : _imageFile == null
+                              ? const Text('No se ha seleccionado ninguna imagen.')
+                              : Image.file(_imageFile!, height: 150, width: 150, fit: BoxFit.cover),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(

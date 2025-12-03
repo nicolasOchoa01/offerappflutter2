@@ -270,7 +270,15 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                 final newPrice = double.tryParse(priceController.text) ?? post.price;
                 final newDiscount = double.tryParse(discountController.text) ?? post.discountPrice;
                 final newStore = storeController.text;
-                notifier.updatePostDetails(post.id, newDesc, newPrice, newDiscount, category, newStore, status);
+                notifier.updatePostDetails(
+                  postId: post.id,
+                  description: newDesc,
+                  price: newPrice,
+                  discountPrice: newDiscount,
+                  category: category,
+                  store: newStore,
+                  status: status,
+                );
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Guardar'),
@@ -454,11 +462,10 @@ class _PostInfoSection extends StatelessWidget {
         ),
         OutlinedButton.icon(
           onPressed: () => Share.share(
-  '¡Mirá esta oferta en OfferApp! '
-  '${post.description} por solo \$${post.discountPrice.toStringAsFixed(2)} '
-  'en ${post.location}. '
-  '👉 https://offerapp.com/post/${post.id}'),//SharePlus.instance.share('¡Mira esta oferta en OfferApp! ${post.description} por solo \$${post.discountPrice}' as ShareParams)
-
+            '¡Mirá esta oferta en OfferApp! '
+            '${post.description} por solo \$${post.discountPrice.toStringAsFixed(2)} '
+            'en ${post.location}. '
+            '👉 https://offerapp.com/post/${post.id}'),
           icon: const Icon(Icons.share),
           label: const Text('Compartir'),
         ),
