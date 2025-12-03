@@ -1,85 +1,68 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:myapp/src/application/auth/auth_state.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
-import 'package:myapp/src/data/services/session_manager.dart';
 import 'package:myapp/src/domain/entities/user.dart';
 
 class AuthNotifier with ChangeNotifier {
   final AuthRepository _repository;
-  final SessionManager _sessionManager;
   final FirebaseMessaging _firebaseMessaging;
 
-  AuthState _state = AuthIdle();
+  AuthState _state = AuthLoading(); // Start in a loading state
   AuthState get state => _state;
 
-  Stream<bool> get isLoggedIn => _sessionManager.isLoggedInFlow;
+  StreamSubscription? _authSubscription;
 
-  AuthNotifier(
-      this._repository, this._sessionManager, this._firebaseMessaging) {
-    _sessionManager.isLoggedInFlow.listen((loggedIn) async {
-      if (loggedIn) {
-        final user = await _repository.getUser(_repository.currentUser!.uid);
-        if (user != null) {
-          _state = AuthSuccess(user);
-        } else {
-          _sessionManager.clearSession();
-        }
+  AuthNotifier(this._repository, this._firebaseMessaging) {
+    // Subscribe to the authentication state stream from the repository
+    _authSubscription = _repository.authStateChanges.listen(_onAuthStateChanged);
+  }
+
+  // This method is the core of the new logic. It reacts to Firebase changes.
+  void _onAuthStateChanged(firebase_auth.User? firebaseUser) async {
+    if (firebaseUser == null) {
+      _state = AuthIdle();
+    } else {
+      final user = await _repository.getUser(firebaseUser.uid);
+      if (user != null) {
+        _state = AuthSuccess(user);
+        // We can save the FCM token here as well upon successful login
+        _saveFCMToken(user.id);
       } else {
-        _state = AuthIdle();
+        // This case is unlikely but good to handle: Firebase user exists,
+        // but our own user document doesn't.
+        _state = AuthError("El usuario de Firebase está autenticado, pero no se encontró el perfil en la base de datos.");
+        // Log out the user to prevent inconsistent state.
+        await logout();
       }
-      notifyListeners();
-    });
+    }
+    notifyListeners();
   }
 
   Future<void> login(String identifier, String password) async {
     _state = AuthLoading();
     notifyListeners();
     try {
-      final firebaseUser = await _repository.loginUser(
-          identifier: identifier, password: password);
-      if (firebaseUser != null) {
-        final user = await _repository.getUser(firebaseUser.uid);
-        if (user != null) {
-          await _sessionManager.saveSessionState(true);
-          await _saveFCMToken();
-          _state = AuthSuccess(user);
-        } else {
-          _state = AuthError("No se pudo cargar el perfil del usuario.");
-        }
-      } else {
-        _state = AuthError("Error al iniciar sesión");
-      }
+      // The stream will handle the AuthSuccess state automatically
+      await _repository.loginUser(identifier: identifier, password: password);
     } catch (e) {
       _state = AuthError(e.toString());
+      notifyListeners();
     }
-    notifyListeners();
   }
 
-  Future<void> register(
-      String email, String password, String username) async {
+  Future<void> register(String email, String password, String username) async {
     _state = AuthLoading();
     notifyListeners();
     try {
-      final firebaseUser = await _repository.registerUser(
-          email: email, password: password, username: username);
-      if (firebaseUser != null) {
-        final user = await _repository.getUser(firebaseUser.uid);
-        if (user != null) {
-          await _sessionManager.saveSessionState(true);
-          await _saveFCMToken();
-          _state = AuthSuccess(user);
-        } else {
-          _state = AuthError("No se pudo cargar el perfil del usuario.");
-        }
-      } else {
-        _state = AuthError("Error al registrar");
-      }
+      // The stream will handle the AuthSuccess state automatically
+      await _repository.registerUser(email: email, password: password, username: username);
     } catch (e) {
       _state = AuthError(e.toString());
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> resetPassword(String email) async {
@@ -87,24 +70,27 @@ class AuthNotifier with ChangeNotifier {
     notifyListeners();
     try {
       await _repository.resetPassword(email: email);
-      _state = PasswordResetSuccess(
-          "Se ha enviado un correo para restablecer tu contraseña.");
+      _state = PasswordResetSuccess("Se ha enviado un correo para restablecer tu contraseña.");
     } catch (e) {
       _state = AuthError(e.toString());
     }
     notifyListeners();
   }
 
+  // Resets the state for UI purposes, e.g., after showing an error.
   void resetAuthState() {
     _state = AuthIdle();
     notifyListeners();
   }
 
   Future<void> logout() async {
-    await _repository.logout();
-    await _sessionManager.clearSession();
-    _state = AuthIdle();
-    notifyListeners();
+    try {
+      await _repository.logout();
+      // The stream will automatically set the state to AuthIdle.
+    } catch (e) {
+      _state = AuthError(e.toString());
+      notifyListeners();
+    }
   }
 
   void setUiError(String message) {
@@ -112,19 +98,24 @@ class AuthNotifier with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveFCMToken() async {
+  Future<void> _saveFCMToken(String userId) async {
     try {
+      // Request permission for notifications (important for iOS)
+      await _firebaseMessaging.requestPermission();
       final token = await _firebaseMessaging.getToken();
       if (token != null) {
-        final userId = _repository.currentUser?.uid;
-        if (userId != null) {
-          await _repository.updateFCMToken(userId: userId, token: token);
-        }
+        await _repository.updateFCMToken(userId: userId, token: token);
       }
     } catch (e) {
       if (kDebugMode) {
-        print("Fallo al obtener el token FCM: $e");
+        print("Fallo al obtener o guardar el token FCM: $e");
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

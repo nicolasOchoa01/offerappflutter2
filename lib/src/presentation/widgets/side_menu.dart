@@ -10,11 +10,17 @@ class SideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final mainNotifier = context.watch<MainNotifier?>();
     final themeNotifier = context.watch<ThemeNotifier>();
+    
+    // List of categories to display in the filter
     final categories = [
       "Todos", "Alimentos", "Tecnología", "Moda", "Deportes", "Construcción",
       "Animales", "Electrodomésticos", "Servicios", "Educación",
       "Juguetes", "Vehículos", "Otros"
     ];
+
+    if (mainNotifier == null) {
+      return const Drawer(); // Return an empty drawer if notifier is not ready
+    }
 
     return Drawer(
       child: Column(
@@ -22,13 +28,13 @@ class SideMenu extends StatelessWidget {
           Container(
             width: double.infinity,
             color: Theme.of(context).colorScheme.primary,
-            padding: const EdgeInsets.symmetric(vertical: 32.0),
+            padding: const EdgeInsets.fromLTRB(16, 48, 16, 24),
             child: Center(
               child: Text(
                 "Filtros",
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -39,38 +45,45 @@ class SideMenu extends StatelessWidget {
               padding: EdgeInsets.zero,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
                   child: Text(
                     'Categorías',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
+                // Create a list tile for each category
                 ...categories.map((category) {
-                  final isSelected = mainNotifier?.selectedCategory == category;
+                  final isSelected = mainNotifier.selectedCategory == category;
                   return ListTile(
+                    dense: true,
                     title: Text(
                       category,
                       style: TextStyle(
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Theme.of(context).colorScheme.primary : null,
                       ),
                     ),
-                    tileColor: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.12) : null,
+                    tileColor: isSelected ? Theme.of(context).colorScheme.primary.withAlpha(25) : null,
                     onTap: () {
-                      mainNotifier?.filterByCategory(category);
-                      Navigator.of(context).pop();
+                      mainNotifier.filterByCategory(category);
+                      Navigator.of(context).pop(); // Close the drawer
                     },
                   );
-                }).toList(),
-                const Divider(height: 1),
+                }),
+                const Divider(height: 20),
+                // Dark mode toggle
                 SwitchListTile(
                   title: Text(
                     'Modo Oscuro',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   value: themeNotifier.isDarkMode ?? false,
                   onChanged: (bool value) {
                     themeNotifier.setTheme(value);
                   },
+                   secondary: Icon(
+                    themeNotifier.isDarkMode ?? false ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                  ),
                 ),
               ],
             ),
