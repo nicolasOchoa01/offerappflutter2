@@ -25,7 +25,7 @@ const lightColorScheme = ColorScheme(
   onTertiary: Colors.white,
   error: Color(0xFFBA1A1A),
   onError: Colors.white,
-  surface: Color(0xFFFCFCFC), 
+  surface: Color(0xFFFCFCFC),
   onSurface: Color(0xFF1C1B1B),
   background: Color(0xFFFCFCFC),
   onBackground: Color(0xFF1C1B1B),
@@ -96,12 +96,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-
         Provider.value(value: authRepository),
         Provider.value(value: postRepository),
         Provider.value(value: sessionManager),
         Provider.value(value: firebaseMessaging),
-        
 
         ChangeNotifierProvider(
           create: (context) => ThemeNotifier(sessionManager),
@@ -110,7 +108,6 @@ class MyApp extends StatelessWidget {
           create: (context) =>
               AuthNotifier(authRepository, sessionManager, firebaseMessaging),
         ),
-        
 
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
           create: (_) => null, // Initially null, created on auth success.
@@ -127,16 +124,13 @@ class MyApp extends StatelessWidget {
                 );
               }
               return previousMainNotifier;
-            }else {
-              previousMainNotifier?.dispose();
-              return null;
             }
+            return null;
           },
         ),
       ],
       child: Builder(
         builder: (context) {
-
           final authNotifier = context.watch<AuthNotifier>();
           final appRouter = AppRouter(authNotifier: authNotifier);
 
