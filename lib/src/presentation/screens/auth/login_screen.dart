@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false; // Add a loading state
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -31,12 +31,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    // FIX: Use the modern AuthNotifier from the provider context.
+
     final authNotifier = context.read<AuthNotifier>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
-      // FIX: Call the login method on the notifier.
+
       await authNotifier.login(
         _emailController.text,
         _passwordController.text,
@@ -67,11 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '%',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
-                  ),
+                   Image.asset(
+        'assets/images/offerapplogopng.png',
+        height: 120,
+      ),
                   const SizedBox(height: 40),
                   TextFormField(
                     controller: _emailController,

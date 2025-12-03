@@ -1,7 +1,4 @@
-
 import 'package:flutter/material.dart';
-import 'package:myapp/src/data/repositories/auth_repository.dart';
-import 'package:provider/provider.dart';
 
 class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
   final String username;
@@ -85,7 +82,7 @@ class CustomHeader extends StatelessWidget implements PreferredSizeWidget {
           Expanded(child: titleWidget),
         ],
       ),
-      backgroundColor: colorScheme.primary,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       elevation: 4,
       actions: [
         PopupMenuButton<String>(

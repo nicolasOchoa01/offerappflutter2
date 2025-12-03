@@ -108,7 +108,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                   ),
                   _CommentsSection(
                     comments: mainNotifier.comments,
-                    onProfileClick: (userId) => context.push('/profile/$userId'),
+                    onProfileClick: (userId) => context.go('/profile/$userId'),
                   )
                 ],
               ),
@@ -198,21 +198,69 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     final descriptionController = TextEditingController(text: post.description);
     final priceController = TextEditingController(text: post.price.toString());
     final discountController = TextEditingController(text: post.discountPrice.toString());
+    final storeController = TextEditingController(text: post.store);
+    String status = post.status;
+    String category = post.category;
 
     return showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Editar Publicación'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Descripción')),
-                TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Precio'), keyboardType: TextInputType.number),
-                TextField(controller: discountController, decoration: const InputDecoration(labelText: 'Precio con Descuento'), keyboardType: TextInputType.number),
-              ],
-            ),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Descripción')),
+                    TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Precio'), keyboardType: TextInputType.number),
+                    TextField(controller: discountController, decoration: const InputDecoration(labelText: 'Precio con Descuento'), keyboardType: TextInputType.number),
+                    TextField(controller: storeController, decoration: const InputDecoration(labelText: 'Tienda')),
+                    DropdownButtonFormField<String>(
+                      value: category,
+                      decoration: const InputDecoration(labelText: 'Categoría'),
+                      items: [
+                        "Todos", "Alimentos", "Tecnología", "Moda", "Deportes", "Construcción",
+                        "Animales", "Electrodomésticos", "Servicios", "Educación",
+                        "Juguetes", "Vehículos", "Otros"
+                      ].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        setState(() {
+                          category = newValue!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text("Estado:", style: Theme.of(context).inputDecorationTheme.labelStyle ?? Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(width: 8),
+                        Radio<String>(
+                          value: 'Activa',
+                          groupValue: status,
+                          onChanged: (value) => setState(() => status = value!),
+                        ),
+                        const Text('Activa'),
+                        Radio<String>(
+                          value: 'Vencida',
+                          groupValue: status,
+                          onChanged: (value) => setState(() => status = value!),
+                        ),
+                        const Text('Vencida'),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancelar')),
@@ -221,7 +269,16 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                 final newDesc = descriptionController.text;
                 final newPrice = double.tryParse(priceController.text) ?? post.price;
                 final newDiscount = double.tryParse(discountController.text) ?? post.discountPrice;
-                notifier.updatePostDetails(post.id, newDesc, newPrice, newDiscount, post.category, post.store);
+                final newStore = storeController.text;
+                notifier.updatePostDetails(
+                  postId: post.id,
+                  description: newDesc,
+                  price: newPrice,
+                  discountPrice: newDiscount,
+                  category: category,
+                  store: newStore,
+                  status: status,
+                );
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Guardar'),
@@ -272,8 +329,9 @@ class _PostInfoSection extends StatelessWidget {
 
     Widget _buildAuthorInfo(BuildContext context, Post post) {
     final sdf = DateFormat('dd MMM yyyy', 'es_ES');
+    final String authorId = post.user?.id ?? '';
     return InkWell(
-      onTap: () => context.push('/profile/${post.user?.id ?? ''}'),
+      onTap: () => context.go('/profile/${post.user?.id ?? ''}'),
       child: Row(
         children: [
           CircleAvatar(
@@ -404,7 +462,11 @@ class _PostInfoSection extends StatelessWidget {
           label: const Text('Favorito'),
         ),
         OutlinedButton.icon(
-          onPressed: () => SharePlus.instance.share('¡Mira esta oferta en OfferApp! ${post.description} por solo \$${post.discountPrice}' as ShareParams),
+          onPressed: () => Share.share(
+            '¡Mirá esta oferta en OfferApp! '
+            '${post.description} por solo \$${post.discountPrice.toStringAsFixed(2)} '
+            'en ${post.location}. '
+            '👉 https://offerapp.com/post/${post.id}'),
           icon: const Icon(Icons.share),
           label: const Text('Compartir'),
         ),
@@ -489,7 +551,7 @@ class _CommentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sdf = DateFormat('dd MMM yyyy, HH:mm', 'es_ES');
-
+    final String userId = comment.user?.id ?? '';
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
@@ -500,7 +562,12 @@ class _CommentItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkWell(
-              onTap: () => onProfileClick(comment.user?.id ?? ''),
+              onTap: () {
+                final String userId = comment.user?.id ?? '';
+                if (userId.isNotEmpty) {
+                  onProfileClick(userId);
+                }
+              },
               child: CircleAvatar(
                 radius: 20,
                 backgroundImage: comment.user?.profileImageUrl != null

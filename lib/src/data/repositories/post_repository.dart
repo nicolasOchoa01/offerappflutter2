@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:myapp/src/domain/entities/comment.dart';
@@ -8,28 +10,25 @@ import 'package:myapp/src/domain/entities/user.dart';
 
 class PostRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final CloudinaryPublic _cloudinary = CloudinaryPublic('ml_default', 'dyloasili', cache: false);
+  final CloudinaryPublic _cloudinary = CloudinaryPublic('dyloasili', 'ml_default', cache: false);
 
-  // Helper to fetch a User object
   Future<User?> _fetchUser(String userId) async {
     if (userId.isEmpty) return null;
     try {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       return userDoc.exists ? User.fromSnapshot(userDoc) : null;
-    } catch (e) {
-      print('Error fetching user: $e');
+    } catch (e, s) {
+      developer.log('Error fetching user', name: 'PostRepository', error: e, stackTrace: s);
       return null;
     }
   }
 
-  // Helper to construct a Post from a document, fetching the user
   Future<Post> _buildPostFromDoc(DocumentSnapshot doc) async {
     final post = Post.fromMap(doc.data() as Map<String, dynamic>, doc.id);
     final user = await _fetchUser(post.userId);
     return post.copyWith(user: user);
   }
 
-  // Helper to construct a Comment from a document, fetching the user
   Future<Comment> _buildCommentFromDoc(DocumentSnapshot doc) async {
     final comment = Comment.fromMap(doc.data() as Map<String, dynamic>, doc.id);
     final user = await _fetchUser(comment.userId);
@@ -44,8 +43,14 @@ class PostRepository {
         .asyncMap((snapshot) => Future.wait(snapshot.docs.map(_buildPostFromDoc)));
   }
 
-  Future<Map<String, dynamic>> getPosts({DocumentSnapshot? lastVisible, int limit = 10, String? category}) async {
-    var query = _firestore.collection('posts').orderBy('timestamp', descending: true).limit(limit);
+  Future<Map<String, dynamic>> getPosts({
+      DocumentSnapshot? lastVisible, 
+      int limit = 10, 
+      String? category, 
+      String orderByField = 'timestamp',
+      bool descending = true,
+    }) async {
+    var query = _firestore.collection('posts').orderBy(orderByField, descending: descending).limit(limit);
 
     if (lastVisible != null) {
       query = query.startAfterDocument(lastVisible);
@@ -69,15 +74,26 @@ class PostRepository {
     return _buildPostFromDoc(doc);
   }
 
-  Future<void> addPost({required Post post, required File imageFile}) async {
-    final docRef = _firestore.collection('posts').doc();
-    final imageUrl = await _uploadImageToCloudinary(imageFile);
+  Future<void> addPost({required Post post, File? imageFile, Uint8List? imageBytes}) async {
+    if (imageFile == null && imageBytes == null) {
+      throw Exception("Se requiere una imagen para crear el post.");
+    }
 
-    // Manually create the map to ensure no nested User object is saved.
+    final docRef = _firestore.collection('posts').doc();
+    String imageUrl;
+
+    if (kIsWeb) {
+      if (imageBytes == null) throw Exception("Los bytes de la imagen son requeridos para la web.");
+      imageUrl = await _uploadImageBytesToCloudinary(imageBytes, docRef.id);
+    } else {
+      if (imageFile == null) throw Exception("El archivo de imagen es requerido para móvil.");
+      imageUrl = await _uploadImageFileToCloudinary(imageFile);
+    }
+
     final postData = {
       'userId': post.userId,
       'description': post.description,
-      'imageUrl': imageUrl, // Use the URL from storage
+      'imageUrl': imageUrl,
       'location': post.location,
       'latitude': post.latitude,
       'longitude': post.longitude,
@@ -85,7 +101,7 @@ class PostRepository {
       'price': post.price,
       'discountPrice': post.discountPrice,
       'store': post.store,
-      'timestamp': FieldValue.serverTimestamp(), // Use server timestamp for reliability
+      'timestamp': FieldValue.serverTimestamp(),
       'status': post.status,
       'scores': [],
     };
@@ -95,8 +111,6 @@ class PostRepository {
 
   Future<void> deletePost(String postId) async {
     await _firestore.collection('posts').doc(postId).delete();
-    // Note: Deleting from Cloudinary would require knowing the public_id, 
-    // which we are not storing. If needed, this functionality would have to be added.
   }
 
     Future<void> updatePostDetails({
@@ -105,7 +119,8 @@ class PostRepository {
       required double price,
       required double discountPrice,
       required String category,
-      required String store
+      required String store,
+      required String status,
     }) async {
     await _firestore.collection('posts').doc(postId).update({
       'description': description,
@@ -113,13 +128,26 @@ class PostRepository {
       'discountPrice': discountPrice,
       'category': category,
       'store': store,
+      'status': status,
     });
   }
 
-  Future<String> _uploadImageToCloudinary(File imageFile) async {
+  Future<String> _uploadImageFileToCloudinary(File imageFile) async {
      try {
       CloudinaryResponse response = await _cloudinary.uploadFile(
         CloudinaryFile.fromFile(imageFile.path, resourceType: CloudinaryResourceType.Image),
+      );
+      return response.secureUrl;
+    } catch (e) {
+      throw Exception('Error al subir la imagen: ${e.toString()}');
+    }
+  }
+
+  Future<String> _uploadImageBytesToCloudinary(Uint8List imageBytes, String publicId) async {
+    try {
+      CloudinaryResponse response = await _cloudinary.uploadFile(
+        CloudinaryFile.fromBytesData(imageBytes, identifier: publicId, resourceType: CloudinaryResourceType.Image),
+        uploadPreset: 'ml_default',
       );
       return response.secureUrl;
     } catch (e) {
@@ -155,7 +183,7 @@ class PostRepository {
       userId: userId,
       text: text,
       timestamp: Timestamp.now(),
-      user: user, // Attach the fetched user
+      user: user,
     );
     await commentRef.set(comment.toMap());
   }
@@ -166,7 +194,6 @@ class PostRepository {
       final snapshot = await transaction.get(postRef);
       if (!snapshot.exists) return;
       
-      // We work with Maps as Firestore gives us, and then we will update the map
       List<dynamic> scoresRaw = List<dynamic>.from(snapshot.data()?['scores'] ?? []);
       List<Map<String, dynamic>> scores = scoresRaw.map((s) => Map<String, dynamic>.from(s as Map)).toList();
 
@@ -187,14 +214,11 @@ class PostRepository {
   }
 
   Future<List<Post>> getPostsForUser(String userId) async {
-    // This query fetches ALL posts for a specific user, ordered by date.
-    // It does not use any in-memory list and is not paginated.
     final snapshot = await _firestore
         .collection('posts')
         .where('userId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .get();
-    // We then build the list of Post objects from the documents.
     return Future.wait(snapshot.docs.map(_buildPostFromDoc));
   }
 
@@ -202,8 +226,6 @@ class PostRepository {
     if (postIds.isEmpty) return [];
 
     List<Post> favoritePosts = [];
-    // Firestore 'in' query is limited to 30 items per query.
-    // We loop through the postIds in chunks of 30.
     for (var i = 0; i < postIds.length; i += 30) {
       final sublist = postIds.sublist(i, i + 30 > postIds.length ? postIds.length : i + 30);
       final snapshot = await _firestore
@@ -218,7 +240,6 @@ class PostRepository {
       favoritePosts.addAll(posts);
     }
     
-    // Sort by timestamp descending, as Firestore 'in' queries don't guarantee order.
     favoritePosts.sort((a, b) {
       if (a.timestamp == null && b.timestamp == null) return 0;
       if (a.timestamp == null) return 1; 

@@ -27,84 +27,85 @@ class AppRouter {
   );
 
   List<RouteBase> get _routes => [
-        StatefulShellRoute.indexedStack(
-          builder: (context, state, navigationShell) {
-            return MainScreen(navigationShell: navigationShell);
-          },
-          branches: [
-            StatefulShellBranch(
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return MainScreen(navigationShell: navigationShell);
+      },
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) {
+                final authState = authNotifier.state;
+                if (authState is AuthSuccess) {
+                  return ProfileScreen(userId: authState.user.id);
+                }
+                // This part should not be reached if redirect is working correctly
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              },
               routes: [
                 GoRoute(
-                  path: '/',
-                  builder: (context, state) => const HomeScreen(),
+                  path: ':userId',
+                  builder: (context, state) {
+                    final userId = state.pathParameters['userId']!;
+                    return ProfileScreen(userId: userId);
+                  },
                 ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                    path: '/profile',
-                    builder: (context, state) {
-                      final authState = authNotifier.state;
-                      if (authState is AuthSuccess) {
-                        return ProfileScreen(userId: authState.user.id);
-                      }
-                      // This part should not be reached if redirect is working correctly
-                      return const Scaffold(
-                          body: Center(child: CircularProgressIndicator()));
-                    },
-                    routes: [
-                      GoRoute(
-                        path: ':userId',
-                        builder: (context, state) {
-                          final userId = state.pathParameters['userId']!;
-                          return ProfileScreen(userId: userId);
-                        },
-                      ),
-                    ]),
               ],
             ),
           ],
         ),
-        GoRoute(
-          path: '/post/:postId',
-          builder: (context, state) {
-            final post = state.extra as Post?;
-            if (post != null) {
-              return PostDetailScreen(post: post);
-            }
-            return const Scaffold(
-                body: Center(child: Text("Post not found or ID is missing")));
-          },
-        ),
-        GoRoute(
-          path: '/login',
-          builder: (context, state) => const LoginScreen(),
-        ),
-        GoRoute(
-          path: '/register',
-          builder: (context, state) => const RegisterScreen(),
-        ),
-        GoRoute(
-          path: '/forgot-password',
-          builder: (context, state) => const ForgotPasswordScreen(),
-        ),
-        GoRoute(
-            path: '/create_post',
-            builder: (context, state) {
-              // The redirect logic ensures the user is logged in,
-              // so we can directly return the screen.
-              // The screen itself will use the MainNotifier to get user data.
-              return const CreatePostScreen();
-            }),
-      ];
+      ],
+    ),
+
+    GoRoute(
+      path: '/post/:postId',
+      builder: (context, state) {
+        final post = state.extra as Post?;
+        if (post != null) {
+          return PostDetailScreen(post: post);
+        }
+        return const Scaffold(
+          body: Center(child: Text("Post not found or ID is missing")),
+        );
+      },
+    ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(
+      path: '/register',
+      builder: (context, state) => const RegisterScreen(),
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: '/create_post',
+      builder: (context, state) {
+        // The redirect logic ensures the user is logged in,
+        // so we can directly return the screen.
+        // The screen itself will use the MainNotifier to get user data.
+        return const CreatePostScreen();
+      },
+    ),
+  ];
 
   String? _redirect(BuildContext context, GoRouterState state) {
     final loggedIn = authNotifier.state is AuthSuccess;
     final location = state.uri.toString();
 
     final isPublicPath =
-        location == '/login' || location == '/register' || location == '/forgot-password';
+        location == '/login' ||
+        location == '/register' ||
+        location == '/forgot-password';
 
     if (!loggedIn && !isPublicPath) {
       return '/login';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:myapp/src/services/auth_service.dart';
+import 'package:myapp/src/application/auth/auth_notifier.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -25,11 +25,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
 
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authNotifier = context.read<AuthNotifier>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
-      await authService.sendPasswordResetEmail(_emailController.text);
+      await authNotifier.resetPassword(_emailController.text);
 
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('Correo de recuperación enviado.')),
@@ -54,10 +54,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '%',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold),
+                  Image.asset(
+                    'assets/images/offerapplogopng.png',
+                    height: 120,
                   ),
                   const SizedBox(height: 40),
                   TextFormField(

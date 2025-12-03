@@ -17,15 +17,9 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     routes: [
+      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-        path: '/',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
@@ -35,9 +29,12 @@ class AppRouter {
       ),
     ],
     redirect: (BuildContext context, GoRouterState state) {
-       final authService = Provider.of<AuthService>(context, listen: false);
+      final authService = Provider.of<AuthService>(context, listen: false);
       final bool loggedIn = authService.currentUser != null;
-      final bool loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register' || state.matchedLocation == '/forgot-password';
+      final bool loggingIn =
+          state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password';
 
       if (!loggedIn) {
         return loggingIn ? null : '/login';
@@ -49,7 +46,9 @@ class AppRouter {
 
       return null;
     },
-     refreshListenable: GoRouterRefreshStream(context.read<AuthService>().authStateChanges),
+    refreshListenable: GoRouterRefreshStream(
+      context.read<AuthService>().authStateChanges,
+    ),
   );
 }
 

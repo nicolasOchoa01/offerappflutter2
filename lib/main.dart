@@ -12,13 +12,57 @@ import 'package:myapp/src/data/repositories/post_repository.dart';
 import 'package:myapp/src/data/services/session_manager.dart';
 import 'package:myapp/src/navigation/app_router.dart';
 import 'package:provider/provider.dart';
+import 'package:myapp/src/services/firebase_messaging_service.dart';
+
+// Color Schemes defined from the native app's theme
+const lightColorScheme = ColorScheme(
+  brightness: Brightness.light,
+  primary: Color(0xFFB71C1C),
+  onPrimary: Colors.white,
+  secondary: Color(0xFF8D6E63),
+  onSecondary: Colors.white,
+  tertiary: Color(0xFFE64A19),
+  onTertiary: Colors.white,
+  error: Color(0xFFBA1A1A),
+  onError: Colors.white,
+  surface: Color(0xFFFCFCFC),
+  onSurface: Color(0xFF1C1B1B),
+  background: Color(0xFFFCFCFC),
+  onBackground: Color(0xFF1C1B1B),
+);
+
+const darkColorScheme = ColorScheme(
+  brightness: Brightness.dark,
+  primary: Color(0xFFE57373),
+  onPrimary: Colors.black,
+  secondary: Color(0xFFBCAAA4),
+  onSecondary: Colors.black,
+  tertiary: Color(0xFFFFB59D),
+  onTertiary: Colors.black,
+  error: Color(0xFFFFB4AB),
+  onError: Color(0xFF690005),
+  surface: Color(0xFF1F1F1F),
+  onSurface: Colors.white,
+  background: Color(0xFF121212),
+  onBackground: Colors.white,
+);
+
+// Typography defined from the native app's theme
+const textTheme = TextTheme(
+  bodyLarge: TextStyle(
+    fontWeight: FontWeight.w400,
+    fontSize: 16.0,
+    height: 1.5, // 24.0sp line height / 16.0sp font size
+    letterSpacing: 0.5,
+  ),
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('es_ES', null);
 
-  // Create instances of repositories and services
+  await FirebaseMessagingService().initialize();
   final authRepository = AuthRepository();
   final postRepository = PostRepository();
   final sessionManager = SessionManager();
@@ -52,14 +96,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // 1. Provide instances of the repositories and services.
-        // This is more robust than creating them inside the provider itself.
         Provider.value(value: authRepository),
         Provider.value(value: postRepository),
         Provider.value(value: sessionManager),
         Provider.value(value: firebaseMessaging),
 
-        // 2. Notifiers that depend on the services above.
         ChangeNotifierProvider(
           create: (context) => ThemeNotifier(sessionManager),
         ),
@@ -68,8 +109,6 @@ class MyApp extends StatelessWidget {
               AuthNotifier(authRepository, sessionManager, firebaseMessaging),
         ),
 
-        // 3. MainNotifier depends on the user from AuthNotifier. It's only available when logged in.
-        // ChangeNotifierProxyProvider is the perfect tool for this.
         ChangeNotifierProxyProvider<AuthNotifier, MainNotifier?>(
           create: (_) => null, // Initially null, created on auth success.
           update: (context, authNotifier, previousMainNotifier) {
@@ -84,36 +123,31 @@ class MyApp extends StatelessWidget {
                   context.read<AuthRepository>(),
                 );
               }
-              return previousMainNotifier; // Return existing if user is the same
+              return previousMainNotifier;
             }
-            return null; // Return null if not authenticated
+            return null;
           },
         ),
       ],
       child: Builder(
         builder: (context) {
-          // Use a Builder to get a context that is a descendant of the providers.
           final authNotifier = context.watch<AuthNotifier>();
           final appRouter = AppRouter(authNotifier: authNotifier);
 
           return MaterialApp.router(
             title: 'OfferApp',
-            // Watch ThemeNotifier to rebuild on theme changes
+
             themeMode: context.watch<ThemeNotifier>().themeMode,
             theme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue,
-                brightness: Brightness.light,
-              ),
+              colorScheme: lightColorScheme,
+              textTheme: textTheme,
               visualDensity: VisualDensity.adaptivePlatformDensity,
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue,
-                brightness: Brightness.dark,
-              ),
+              colorScheme: darkColorScheme,
+              textTheme: textTheme,
             ),
             routerConfig: appRouter.router,
           );

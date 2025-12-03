@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:myapp/src/data/repositories/auth_repository.dart';
@@ -24,7 +23,7 @@ class MainNotifier with ChangeNotifier {
   String _searchQuery = "";
   String get searchQuery => _searchQuery;
 
-  final String _selectedCategory = "Todos";
+  String _selectedCategory = "Todos";
   String get selectedCategory => _selectedCategory;
 
   int _selectedFeedTab = 0;
@@ -49,7 +48,7 @@ class MainNotifier with ChangeNotifier {
     try {
       return _allPosts.firstWhere((p) => p.id == _selectedPostId);
     } catch (e) {
-      return null; 
+      return null;
     }
   }
 
@@ -99,7 +98,7 @@ class MainNotifier with ChangeNotifier {
         notifyListeners();
       }
     });
-    _myCommentsSubscription = _postRepository.getCommentsForUserStream(_user.id).listen((comments) {
+    _myCommentsSubscription = _postRepository.getCommentsStream(_user.id).listen((comments) {
       _myComments = comments;
       notifyListeners();
     });
@@ -113,7 +112,7 @@ class MainNotifier with ChangeNotifier {
     _isDarkTheme = isDark;
     notifyListeners();
   }
-  
+
   void updateSearchQuery(String newQuery) {
     _searchQuery = newQuery;
     _applyFilters();
@@ -165,15 +164,7 @@ class MainNotifier with ChangeNotifier {
     } else {
       _commentsSubscription?.cancel();
     }
-
-    if (postId == null) {
-      // When deselecting a post (from dispose), schedule the notification
-      // to prevent calling it while the widget tree is locked.
-      Future.microtask(notifyListeners);
-    } else {
-      // Otherwise, notify immediately.
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
   void _loadComments(String postId) {
@@ -201,38 +192,30 @@ class MainNotifier with ChangeNotifier {
 
     try {
       final profileToLoad = userId == _user.id ? _user : await _authRepository.getUser(userId);
-      if (profileToLoad == null) return;
-
       _profileUser = profileToLoad;
-      notifyListeners();
 
-      _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
-      notifyListeners();
-
-      if (profileToLoad.favorites.isNotEmpty) {
+      if (profileToLoad != null) {
+        _profileUserPosts = await _postRepository.getPostsForUser(profileToLoad.id);
         _profileUserFavorites = await _postRepository.getFavoritePosts(profileToLoad.favorites);
-        notifyListeners();
+        _profileCommentsSubscription = _postRepository.getCommentsStream(profileToLoad.id).listen((comments) {
+            _profileUserComments = comments;
+            notifyListeners();
+        });
       }
-
-      _profileCommentsSubscription = _postRepository.getCommentsForUserStream(profileToLoad.id).listen((comments) {
-          _profileUserComments = comments;
-          notifyListeners();
-      });
-
     } catch(e) {
         if (kDebugMode) {
           print("Error loading user profile: $e");
         }
     }
+    notifyListeners();
   }
 
-
-   Future<void> refreshCurrentUser() async {
+  Future<void> refreshCurrentUser() async {
     try {
       final refreshedUser = await _authRepository.getUser(_user.id);
       if (refreshedUser != null) {
         _user = refreshedUser;
-        _applyFilters(); 
+        _applyFilters();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -273,22 +256,20 @@ class MainNotifier with ChangeNotifier {
     }
   }
 
-    Future<void> updateProfileImage(File imageFile) async {
-      try {
-        await _authRepository.updateUserProfileImage(uid: _user.id, imageFile: imageFile);
-        await refreshCurrentUser();
-      } catch (e) {
-        if(kDebugMode) {
-          print("Error updating profile image: $e");
-        }
+  Future<void> updateProfileImage(File imageFile) async {
+    try {
+      await _authRepository.updateUserProfileImage(uid: _user.id, imageFile: imageFile);
+      await refreshCurrentUser();
+    } catch (e) {
+      if(kDebugMode) {
+        print("Error updating profile image: $e");
       }
     }
+  }
 
   Future<void> addComment(String postId, String text) async {
     try {
       await _postRepository.addComment(postId: postId, text: text, userId: _user.id);
-      // The stream in loadUserProfile will handle the update automatically.
-      // No need to call notifyListeners() here if streams are set up correctly.
     } catch (e) {
       if (kDebugMode) {
         print("Error adding comment: $e");
@@ -298,7 +279,8 @@ class MainNotifier with ChangeNotifier {
 
   Future<void> addPost({
     required String description,
-    required File imageFile,
+    File? imageFile,
+    Uint8List? imageBytes,
     required String location,
     required double latitude,
     required double longitude,
@@ -309,10 +291,10 @@ class MainNotifier with ChangeNotifier {
   }) async {
     try {
       final newPost = Post(
-        id: '', 
+        id: '',
         userId: _user.id,
         description: description,
-        imageUrl: '', 
+        imageUrl: '',
         location: location,
         latitude: latitude,
         longitude: longitude,
@@ -320,14 +302,14 @@ class MainNotifier with ChangeNotifier {
         price: price,
         discountPrice: discountPrice,
         store: store,
-        user: _user, 
+        user: _user,
         timestamp: Timestamp.now(),
         status: 'Activa',
         scores: [],
       );
-      
-      await _postRepository.addPost(post: newPost, imageFile: imageFile);
-      
+
+      await _postRepository.addPost(post: newPost, imageFile: imageFile, imageBytes: imageBytes);
+
       refreshPosts();
     } catch (e) {
       if (kDebugMode) {
@@ -349,14 +331,15 @@ class MainNotifier with ChangeNotifier {
     }
   }
 
-  Future<void> updatePostDetails(
-    String postId,
-    String description,
-    double price,
-    double discountPrice,
-    String category,
-    String store,
-  ) async {
+  Future<void> updatePostDetails({
+    required String postId,
+    required String description,
+    required double price,
+    required double discountPrice,
+    required String category,
+    required String store,
+    required String status,
+  }) async {
     try {
       await _postRepository.updatePostDetails(
         postId: postId,
@@ -365,6 +348,7 @@ class MainNotifier with ChangeNotifier {
         discountPrice: discountPrice,
         category: category,
         store: store,
+        status: status,
       );
       final updatedPost = await _postRepository.getPostFuture(postId);
       if (updatedPost != null) {
@@ -382,37 +366,27 @@ class MainNotifier with ChangeNotifier {
   }
 
   void toggleFavorite(String postId) {
-    final isCurrentlyFavorite = _user.favorites.contains(postId);
-    final originalFavorites = List<String>.from(_user.favorites);
+      final isCurrentlyFavorite = _user.favorites.contains(postId);
+      final originalFavorites = List<String>.from(_user.favorites);
 
-    // Optimistically update the UI
-    if (isCurrentlyFavorite) {
-      _user.favorites.remove(postId);
-    } else {
-      _user.favorites.add(postId);
-    }
-    notifyListeners();
-
-    // Update the backend and handle errors
-    try {
       if (isCurrentlyFavorite) {
-        _authRepository.removeFavorite(userId: _user.id, postId: postId);
+        _user.favorites.remove(postId);
       } else {
-        _authRepository.addFavorite(userId: _user.id, postId: postId);
+        _user.favorites.add(postId);
       }
-    } catch (e) {
-      // Revert UI on error
-      _user = _user.copyWith(favorites: originalFavorites);
       notifyListeners();
-    }
 
-    // If the current user is viewing their own profile, refresh the favorite posts list
-    if (_profileUser?.id == _user.id) {
-      _postRepository.getFavoritePosts(_user.favorites).then((posts) {
-        _profileUserFavorites = posts;
-        notifyListeners();
-      });
-    }
+      if (isCurrentlyFavorite) {
+        _authRepository.removeFavorite(userId: _user.id, postId: postId).catchError((_){
+            _user = _user.copyWith(favorites: originalFavorites);
+            notifyListeners();
+        });
+      } else {
+        _authRepository.addFavorite(userId: _user.id, postId: postId).catchError((_){
+            _user = _user.copyWith(favorites: originalFavorites);
+            notifyListeners();
+        });
+      }
   }
 
   Future<void> voteOnPost(String postId, int value) async {
@@ -427,7 +401,7 @@ class MainNotifier with ChangeNotifier {
         final postIndex = _allPosts.indexWhere((p) => p.id == postId);
         if (postIndex != -1) {
           _allPosts[postIndex] = updatedPost;
-          _applyFilters(); 
+          _applyFilters();
         }
       }
     } catch (e) {
@@ -437,6 +411,11 @@ class MainNotifier with ChangeNotifier {
     }
   }
 
+  void filterByCategory(String category) {
+    _selectedCategory = category;
+    refreshPosts();
+  }
+
   void _applyFilters() {
     List<Post> filteredPosts = _allPosts;
 
@@ -444,10 +423,15 @@ class MainNotifier with ChangeNotifier {
       filteredPosts = filteredPosts.where((post) => _user.following.contains(post.user?.id)).toList();
     }
 
+    if (_selectedCategory != "Todos") {
+      filteredPosts = filteredPosts.where((post) => post.category == _selectedCategory).toList();
+    }
+
     if (_searchQuery.isNotEmpty) {
       filteredPosts = filteredPosts.where((post) {
         return post.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            post.location.toLowerCase().contains(_searchQuery.toLowerCase());
+            post.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (post.user?.username.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
       }).toList();
     }
 
