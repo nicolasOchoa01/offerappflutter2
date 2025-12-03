@@ -80,22 +80,17 @@ class PostRepository {
     }
 
     final docRef = _firestore.collection('posts').doc();
-    final imageUrl = await _uploadImageToCloudinary(imageFile);
-
-    final Map<String, dynamic>? userDataForFCM = post.user != null ? {
-      'uid': post.user!.id,
-      'username': post.user!.username,
-    } : null;
-    // Manually create the map to ensure no nested User object is saved.
     String imageUrl;
+
     if (kIsWeb) {
-      imageUrl = await _uploadImageBytesToCloudinary(imageBytes!, docRef.id);
+      if (imageBytes == null) throw Exception("Los bytes de la imagen son requeridos para la web.");
+      imageUrl = await _uploadImageBytesToCloudinary(imageBytes, docRef.id);
     } else {
-      imageUrl = await _uploadImageFileToCloudinary(imageFile!);
+      if (imageFile == null) throw Exception("El archivo de imagen es requerido para móvil.");
+      imageUrl = await _uploadImageFileToCloudinary(imageFile);
     }
 
     final postData = {
-      'user': userDataForFCM,
       'userId': post.userId,
       'description': post.description,
       'imageUrl': imageUrl,
